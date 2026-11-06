@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Account galaxy: live Nano sends</title>
+<style>
+:root{--ink:#080718;--fg:#e6ecff;--dim:#8f98c4;--line:#2b2760;--ember:#ff6a3c;--cyan:#2fc4d6;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--fg);overflow:hidden;
+font:13px/1.45 "Bahnschrift","DIN Alternate","Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif}
+canvas{position:absolute;inset:0 0 68px;width:100%;height:calc(100% - 68px)}
+#o{pointer-events:none}
+#hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));
+width:min(300px,calc(100% - 20px));padding:12px 14px;background:rgba(8,7,24,.8);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(6px)}
+h1{font-size:20px;margin:0 0 4px;font-weight:700;letter-spacing:.01em}
+#st{display:flex;gap:7px;align-items:center;color:var(--dim);margin-bottom:8px}
+#dot{width:8px;height:8px;border-radius:50%;background:#666;flex:none}
+#dot.on{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+#dot.sim{background:var(--ember);box-shadow:0 0 8px var(--ember)}
+.r{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0}
+select,button{background:#14123a;color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:3px 8px;font:inherit}
+button{cursor:pointer}
+select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+#stats{margin:8px 0 6px;white-space:pre-line}
+.n{color:var(--dim);font-size:12px;margin:5px 0 0}
+.reading{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;line-height:1.7;letter-spacing:.02em}
+.reading p{margin:0 0 9px}
+.reading p:last-child{margin-bottom:0;color:var(--fg)}
+.reading strong{font-weight:600;color:#6ee2f0}
+.reading .activity{color:#f6c744}
+.reading .recency{color:#d282ff}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><canvas id="t"></canvas><canvas id="o"></canvas>
+<div id="hud">
+<h1>Account galaxy</h1>
+<div id="st"><i id="dot"></i><span id="stt">starting</span></div>
+<label class="r">Node <select id="host">
+<option value="wss://ws.nano.to">Nano.to</option>
+<option value="wss://node.somenano.com/repeater">SomeNano network repeater</option>
+<option value="stress">Stress demo · 30×</option><option value="demo">Simulated data</option></select></label>
+<label class="r">Memory <select id="win"><option value="10">10 minutes</option><option value="30" selected>30 minutes</option><option value="60">60 minutes</option></select></label>
+<button id="stressReplay" type="button" hidden>Replay 10-second stress demo</button>
+<label class="r" for="snd"><span>SoundFX</span><input id="snd" type="checkbox" aria-describedby="audioState"></label>
+<div id="audioState" class="n" role="status"></div>
+<div id="stats"></div>
+<div class="n reading">
+<p><strong>Dots</strong> are accounts.<br><strong>Lines</strong> are transfers.</p>
+<p><strong class="activity">Size</strong> tells activity.<br><strong class="recency">Colour</strong> tells recency.</p>
+<p>Hover to <strong>discover.</strong></p>
+</div>
+</div>
+<script src="js/gallery-nav.js"></script>
+<script src="js/event-utils.js"></script>
+<script src="js/nano-feed.js"></script>
+<script src="js/sound-fx.js"></script>
+<script src="js/logo-gravity.js"></script>
+<script src="js/stress-demo.js"></script>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const cv=$('c'),cx=cv.getContext('2d'),tc=$('t'),tx=tc.getContext('2d'),ov=$('o'),ox=ov.getContext('2d');
+let isDemo=false,nPend=0,rpc='',rpcFail=0,feedClient=null;const store=[],sendBy=new Map(),want=new Map();
+const RPCS={'ws.nano.to':'https://rpc.nano.to','rainstorm.city':'https://rainstorm.city/api','node.somenano.com':'https://node.somenano.com/proxy','socket.nanos.cc':'https://proxy.nanos.cc/proxy','ws.powernode.cc':'https://proxy.powernode.cc/proxy'};
+const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+let W=1,H=1,dpr=1,winMs=30*6e4,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
+const soundFX=createSoundFX();
+let stressPlayback=null;
+const timeScale=()=>stressPlayback?30:1;
+const stressTime=()=>stressPlayback.started===null?0:Math.min(stressPlayback.duration+8000,(performance.now()-stressPlayback.started)*30);
+const stressElapsed=()=>Math.min(stressPlayback.duration,stressTime());
+const timeNow=()=>stressPlayback?stressPlayback.epoch+stressTime():Date.now();
+const animationNow=()=>stressPlayback?stressPlayback.origin+stressTime():performance.now();
+const random=()=>stressPlayback?stressPlayback.random():Math.random();
+const nodes=new Map(),edges=new Map(),comets=[],bursts=[],floats=[],cam={x:0,y:0,s:1},mouse={x:-99,y:-99};
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const short=a=>a.length>16?a.slice(0,9)+'\u2026'+a.slice(-4):a;
+const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(3)):x.toExponential(1))+' XNO';
+const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
+const S=[[0,40,36,130],[.25,30,120,190],[.5,47,196,170],[.7,246,199,68],[.88,255,106,60],[1,255,238,244]];
+function hc(t){let j=1;while(j<S.length-1&&S[j][0]<t)j++;const a=S[j-1],b=S[j],u=(t-a[0])/(b[0]-a[0]);return[(a[1]+(b[1]-a[1])*u)|0,(a[2]+(b[2]-a[2])*u)|0,(a[3]+(b[3]-a[3])*u)|0]}
+function mk(r,g,b){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d'),gr=x.createRadialGradient(32,32,0,32,32,32);
+gr.addColorStop(0,'rgba(255,255,255,.95)');gr.addColorStop(.12,`rgba(${r},${g},${b},.9)`);gr.addColorStop(.4,`rgba(${r},${g},${b},.25)`);gr.addColorStop(1,`rgba(${r},${g},${b},0)`);x.fillStyle=gr;x.fillRect(0,0,64,64);return c}
+const SP=[],CS=[];for(let i=0;i<16;i++){const[r,g,b]=hc(i/15);CS.push(r+','+g+','+b);SP.push(mk(r,g,b))}
+const KC={send:[255,238,244],receive:[110,226,240],open:[246,199,68],change:[210,130,255],epoch:[150,150,255]},KS={},RC={};
+for(const k in KC){KS[k]=k==='send'?SP[15]:mk(...KC[k]);RC[k]=KC[k].join(',')}
+const heat=age=>clamp(1-Math.log10(1+age/1e3)/Math.log10(1+winMs/1e3),0,1);
+const accountRadius=p=>Math.min(18,4+2.4*Math.log2(1+p.n));
+const stars=Array.from({length:150},()=>({x:random(),y:random(),z:.2+random()*.8}));
+function size(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;setNanoLogoViewport(W-(W>800?300:0),H);for(const c of[cv,tc,ov]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr)}}
+const off=()=>W>800?150:0;
+const X=x=>W/2+off()+(x-cam.x)*cam.s,Y=y=>H/2+(y-cam.y)*cam.s;
+
+function node(a,near){let p=nodes.get(a);if(!p){const an=random()*6.283,d=near?18:60*random();
+p={a,x:(near?near.x:0)+Math.cos(an)*d,y:(near?near.y:0)+Math.sin(an)*d,vx:0,vy:0,fx:0,fy:0,n:0,pulse:0,last:0,k:[]};nodes.set(a,p)}return p}
+function getEdge(s,d){const k=s.a+'>'+d.a;let e=edges.get(k);if(!e){e={s,d,ts:[],am:[],pend:0};edges.set(k,e)}return e}
+function ingest(sa,da,x,t,anim,hash){
+if(!sa||!da||sa===da||!(x>0))return;
+const s=node(sa),d=node(da,s),e=getEdge(s,d);
+e.ts.push(t);e.am.push(x);s.n++;d.n++;s.last=d.last=t;nSends++;last={sa,da,x};
+if(anim){if(!isDemo){store.push([sa,da,x,t]);if(store.length>1200)store.splice(0,store.length-600)}
+if(hash){e.pend++;sendBy.set(hash,{e,t,x,r:false});if(sendBy.size>5000)sendBy.delete(sendBy.keys().next().value)}
+const la=Math.log10(x);comets.push({s,d,t0:animationNow(),du:RM?1:850+random()*300,la,x,kind:'send'});s.pulse=1;blip(la)}}
+function land(a,src,x,t,isOpen){
+x=x>0?x:0;const kind=isOpen?'open':'receive',la=x>0?Math.log10(x):-2,h=src&&sendBy.get(src),tag=isOpen?', new account':'';
+if(h&&!h.r&&h.e.d.a===a&&edges.get(h.e.s.a+'>'+a)===h.e){h.r=true;if(h.e.pend>0)h.e.pend--;h.e.d.last=t;h.e.d.pulse=1;
+comets.push({s:h.e.s,d:h.e.d,t0:animationNow(),du:RM?1:700,la,x:h.x,kind,txt:fmt(h.x)+tag+', received after '+fd(t-h.t)});blip(la,.05,.5);return}
+const r=node(a),an=random()*6.283;r.k.push(t);r.n++;r.last=t;
+comets.push({s:{x:r.x+Math.cos(an)*240,y:r.y+Math.sin(an)*240},d:r,t0:animationNow(),du:RM?1:1100,la,x,kind,txt:fmt(x)+tag+', received'});
+blip(la,.05,.5);
+if(src&&rpc&&rpcFail<3){want.set(src,{r,t,x});if(want.size>500)want.delete(want.keys().next().value)}}
+function mark(a,kind,t){const p=node(a);p.k.push(t);p.n++;p.last=t;p.pulse=1;
+if(bursts.length<120)bursts.push({d:p,t0:animationNow(),la:-2,kind});if(floats.length<60)floats.push({d:p,t0:animationNow(),txt:kind==='change'?'representative change':'epoch upgrade',kind})}
+function link(sa,r,x,t0){const s=node(sa,r),e=getEdge(s,r),now=timeNow();e.ts.push(now);e.am.push(x);s.n++;s.last=now;
+const i=r.k.indexOf(t0);if(i>=0)r.k.splice(i,1);
+comets.push({s,d:r,t0:animationNow(),du:RM?1:700,la:Math.log10(x),x,kind:'receive',txt:''})}
+function handle(c){
+const b=parseNanoBlock(c.block);if(!b)return;
+const sub=b.subtype||b.type||'other',now=timeNow(),x=Number(c.amount)/1e30,a=b.account||c.account;
+cnt[sub]=(cnt[sub]||0)+1;
+if(sub==='send')ingest(a,b.link_as_account||b.destination,x,now,true,c.hash);
+else if(sub==='receive'||sub==='open')land(a,b.link||b.source,x,now,sub==='open');
+else if(sub==='change'||sub==='epoch')mark(a,sub,now)}
+async function resolve(){
+if(!rpc||rpcFail>=3||!want.size)return;
+const hs=[...want.keys()].slice(0,25);
+try{const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'blocks_info',hashes:hs,json_block:'true'})});
+if(!r.ok)throw 0;const j=await r.json();if(!j.blocks)throw 0;rpcFail=0;
+for(const h of hs){const w=want.get(h);want.delete(h);const bi=j.blocks[h];if(!bi||!w)continue;
+const x=Number(bi.amount)/1e30;if(bi.block_account&&bi.block_account!==w.r.a)link(bi.block_account,w.r,x>0?x:w.x,w.t)}}
+catch(e){rpcFail++;if(rpcFail>=3)want.clear()}}
+
+function layout(){
+const a=[...nodes.values()],n=a.length;
+for(const p of a){p.fx=-p.x*.0001;p.fy=-p.y*.0001}
+applyNanoLogoGravity(a);
+for(let i=0;i<n;i++){const p=a[i];for(let j=i+1;j<n;j++){const q=a[j],dx=p.x-q.x,dy=p.y-q.y,d2=dx*dx+dy*dy+.01;if(d2>45000)continue;
+const k=180/(d2*Math.sqrt(d2)),fx=dx*k,fy=dy*k;p.fx+=fx;p.fy+=fy;q.fx-=fx;q.fy-=fy}}
+applyTransferSprings(a);
+for(const p of a){p.vx=clamp((p.vx+p.fx)*.86,-8,8);p.vy=clamp((p.vy+p.fy)*.86,-8,8);p.x+=p.vx;p.y+=p.vy}
+}
+
+function applyTransferSprings(points){
+for(const p of points){p.linkX=0;p.linkY=0}
+for(const e of edges.values()){const dx=e.d.x-e.s.x,dy=e.d.y-e.s.y,d=Math.sqrt(dx*dx+dy*dy)+.01,tension=(d-44)*.012*(1+Math.log2(e.ts.length)*.3),f=.12*Math.tanh(tension/.12),fx=dx/d*f,fy=dy/d*f;e.s.linkX+=fx;e.s.linkY+=fy;e.d.linkX-=fx;e.d.linkY-=fy}
+
+// Bound the sum, so highly connected hubs cannot overwhelm the density field.
+for(const p of points){const scale=Math.min(1,.2/(Math.hypot(p.linkX,p.linkY)||1));p.fx+=p.linkX*scale;p.fy+=p.linkY*scale}
+}
+
+function prune(now){
+const cut=now-winMs;nSends=0;nPend=0;
+for(const[k,e]of edges){let i=0;while(i<e.ts.length&&e.ts[i]<cut)i++;if(i){e.ts.splice(0,i);e.am.splice(0,i)}
+if(!e.ts.length)edges.delete(k);else{nSends+=e.ts.length;e.pend=Math.min(e.pend,e.ts.length);nPend+=e.pend}}
+for(;;){for(const p of nodes.values()){while(p.k.length&&p.k[0]<cut)p.k.shift();p.n=p.k.length}
+for(const e of edges.values()){e.s.n+=e.ts.length;e.d.n+=e.ts.length}
+for(const[k,p]of nodes)if(!p.n)nodes.delete(k);
+if(nodes.size<=800)break;
+if(edges.size){for(const[k]of[...edges.entries()].sort((a,b)=>a[1].ts[a[1].ts.length-1]-b[1].ts[b[1].ts.length-1]).slice(0,40))edges.delete(k)}
+else for(const p of[...nodes.values()].sort((a,b)=>a.last-b.last).slice(0,40))nodes.delete(p.a)}
+hubs=[...nodes.values()].filter(p=>p.n>=3).sort((a,b)=>b.n-a.n).slice(0,7)}
+
+function blip(la,v=.1,pf=1){soundFX.play({frequency:196*pf*2**(clamp((la+8)/13,0,1)*3),volume:v})}
+
+function fitCamera(){
+if(nodes.size){let a=1e9,b=-1e9,c=1e9,d=-1e9;for(const p of nodes.values()){if(p.x<a)a=p.x;if(p.x>b)b=p.x;if(p.y<c)c=p.y;if(p.y>d)d=p.y}
+const AW=W-(W>800?300:0),ts=clamp(Math.min(AW/(b-a+160),H/(d-c+160)),.25,2.4);
+cam.s+=(ts-cam.s)*.03;cam.x+=((a+b)/2-cam.x)*.03;cam.y+=((c+d)/2-cam.y)*.03}
+}
+function drawBackground(pn){
+cx.setTransform(dpr,0,0,dpr,0,0);cx.globalCompositeOperation='source-over';cx.globalAlpha=1;cx.fillStyle='#080718';cx.fillRect(0,0,W,H);
+for(const s of stars){const px=((s.x*W-cam.x*cam.s*s.z*.12)%W+W)%W,py=((s.y*H-cam.y*cam.s*s.z*.12)%H+H)%H;
+const glimmer=RM?1:.94+.06*Math.sin(pn*.001*(.4+s.z)+s.x*40),radius=.45+.35*s.z;
+cx.fillStyle=`rgba(205,215,255,${(.3+.45*s.z)*glimmer})`;cx.beginPath();cx.arc(px,py,radius,0,Math.PI*2);cx.fill()}
+}
+function drawEdges(now){
+cx.lineCap='round';let dash=false;
+const density=1/Math.sqrt(Math.max(1,edges.size/80));
+for(const e of edges.values()){const pd=e.pend>0;if(pd!==dash){cx.setLineDash(pd?[3,5]:[]);dash=pd}const h=heat(now-e.ts[e.ts.length-1]);
+const emphasis=e.s===hover||e.d===hover?1:nanoLogoEdgeOpacity(e.s,e.d);
+cx.strokeStyle=`rgba(${CS[Math.round(h*15)]},${(.1+.5*h)*density*emphasis})`;cx.lineWidth=Math.min(2,.6+Math.log2(1+e.ts.length)*.3);
+cx.beginPath();cx.moveTo(X(e.s.x),Y(e.s.y));cx.lineTo(X(e.d.x),Y(e.d.y));cx.stroke()}
+}
+function drawAccounts(now){
+cx.setLineDash([]);cx.globalCompositeOperation='source-over';
+let hv=null,hd=1e9;
+for(const p of nodes.values()){const h=heat(now-p.last),i=Math.round(h*15),rad=accountRadius(p)*(1+p.pulse*.35),sz=rad*3*cam.s,sx=X(p.x),sy=Y(p.y);
+cx.globalAlpha=.45+.25*h;cx.drawImage(SP[i],sx-sz/2,sy-sz/2,sz,sz);cx.globalAlpha=1;cx.fillStyle=`rgb(${CS[i]})`;cx.beginPath();cx.arc(sx,sy,Math.max(1.3,rad*.22*cam.s),0,6.283);cx.fill();
+p.pulse*=.94**timeScale();const dd=Math.hypot(sx-mouse.x,sy-mouse.y);if(dd<Math.max(10,rad*cam.s)+6&&dd<hd){hd=dd;hv=p}}
+hover=hv;
+}
+function drawComets(pn){
+// Rebuild short trails each frame. Repeated alpha erasure can leave permanent
+// low-alpha pixels through rounding, which become visible as ghostly smears.
+tx.setTransform(dpr,0,0,dpr,0,0);tx.clearRect(0,0,W,H);tx.globalCompositeOperation='source-over';
+for(let i=comets.length-1;i>=0;i--){const c=comets[i],u=(pn-c.t0)/c.du;
+if(u>=1){comets.splice(i,1);c.d.pulse=1;if(bursts.length<120)bursts.push({d:c.d,t0:pn,la:c.la,kind:c.kind});const tt=c.txt===undefined?fmt(c.x):c.txt;if(tt&&floats.length<60)floats.push({d:c.d,t0:pn,txt:tt,kind:c.kind});continue}
+const sz=clamp(12+(c.la+6)*2,12,30);
+for(let j=RM?0:8;j>=0;j--){const past=u-j*22/c.du;if(past<0)continue;
+const e=past*past*(3-2*past),px=X(c.s.x+(c.d.x-c.s.x)*e),py=Y(c.s.y+(c.d.y-c.s.y)*e);
+tx.globalAlpha=j===0?.75:.08*(1-j/9);tx.drawImage(KS[c.kind||'send'],px-sz/2,py-sz/2,sz,sz)}
+tx.globalAlpha=1}
+}
+function drawHover(now){
+if(hover){let so=0,si=0,ao=0,ai=0;for(const e of edges.values()){if(e.s===hover){so+=e.ts.length;for(const v of e.am)ao+=v}if(e.d===hover){si+=e.ts.length;for(const v of e.am)ai+=v}}
+const L=[hover.a,`sent ${so} (${fmt(ao)}), received ${si} (${fmt(ai)})`,`last activity ${fd(now-hover.last)} ago`];if(hover.k.length)L.push(`${hover.k.length} receives of earlier sends or other blocks`);
+ox.font='11px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif';ox.textAlign='left';const tw=Math.max(...L.map(s=>ox.measureText(s).width))+16,bx=Math.min(mouse.x+14,W-tw-6),by=Math.min(mouse.y+14,H-66);
+ox.fillStyle='rgba(8,7,24,.92)';ox.strokeStyle='#2b2760';ox.fillRect(bx,by,tw,16*L.length+8);ox.strokeRect(bx,by,tw,16*L.length+8);ox.fillStyle='#e6ecff';L.forEach((s,i)=>ox.fillText(s,bx+8,by+17+i*16))}
+}
+function drawOverlay(pn,now){
+ox.setTransform(dpr,0,0,dpr,0,0);ox.clearRect(0,0,W,H);ox.font='11px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif';ox.textAlign='center';
+if(!nodes.size){const cxm=W/2+off(),r=(pn/25)%70;ox.textAlign='center';ox.strokeStyle=`rgba(143,152,196,${.5*(1-r/70)})`;ox.lineWidth=1.5;ox.beginPath();ox.arc(cxm,H/2-34,12+r,0,6.283);ox.stroke();
+ox.fillStyle='#e6ecff';ox.font='17px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif';ox.fillText('Waiting for the first confirmed send',cxm,H/2+24);
+ox.fillStyle='#8f98c4';ox.font='13px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif';ox.fillText($('stt').textContent+(seen?`, ${seen} confirmations seen so far`:''),cxm,H/2+46);ox.font='11px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif'}
+ox.globalCompositeOperation='lighter';
+for(let i=bursts.length-1;i>=0;i--){const b=bursts[i],a=(pn-b.t0)/1300;if(a>=1){bursts.splice(i,1);continue}
+ox.strokeStyle=`rgba(${RC[b.kind||'send']},${(1-a)*.8})`;ox.lineWidth=1.5;ox.beginPath();ox.arc(X(b.d.x),Y(b.d.y),(10+clamp((b.la+6)*5,0,40))*a*cam.s+4,0,6.283);ox.stroke()}
+ox.globalCompositeOperation='source-over';
+ox.fillStyle='#b9c4f2';for(const p of hubs)ox.fillText(short(p.a),X(p.x),Y(p.y)+accountRadius(p)*cam.s*1.5+10);
+for(let i=floats.length-1;i>=0;i--){const f=floats[i],a=(pn-f.t0)/2600;if(a>=1){floats.splice(i,1);continue}
+ox.fillStyle=`rgba(${RC[f.kind||'send']},${1-a})`;ox.font='13px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif';ox.fillText(f.txt,X(f.d.x),Y(f.d.y)-16-a*22)}
+drawHover(now);
+}
+function frame(pn){
+pn=animationNow();advanceStress();
+const now=timeNow(),steps=stressPlayback&&stressTime()>=stressPlayback.duration+8000?0:timeScale();
+for(let step=0;step<steps;step++)layout();if(now-lastPrune>1000){prune(now);lastPrune=now}
+fitCamera();drawBackground(pn);drawEdges(now);drawAccounts(now);drawComets(pn);drawOverlay(pn,now);
+requestAnimationFrame(frame)}
+
+function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
+function clearAll(){nodes.clear();edges.clear();sendBy.clear();want.clear();comets.length=bursts.length=floats.length=0;seen=0;cnt={};lastMsg=0;last=null;nSends=0;hubs=[]}
+const dupS=new Set(),dupQ=[];
+function stop(){stressPlayback=null;$('stressReplay').hidden=true;clearTimeout(timer);if(feedClient){feedClient.stop();feedClient=null}}
+function connect(){
+stop();const u=$('host').value;if(u==='stress'){startStress();return}if(u==='demo'){demo();return}isDemo=false;rpc=new URLSearchParams(location.search).get('rpc')||RPCS[new URL(u).host]||'';rpcFail=0;want.clear();
+feedClient=createNanoFeed(u,{
+onPacket:m=>{if(m.topic!=='confirmation'||!m.message)return;const c=m.message;
+if(c.hash){if(dupS.has(c.hash))return;dupS.add(c.hash);dupQ.push(c.hash);if(dupQ.length>5000)dupS.delete(dupQ.shift())}
+seen++;lastMsg=timeNow();handle(c)},
+onStatus:t=>status(t,t.startsWith('Connecting')||t.includes('reconnecting')?'':'on'),
+onGap:()=>{}
+})}
+function startStress(paused=new URLSearchParams(location.search).get('stress')==='ready'){
+clearAll();isDemo=true;rpc='';
+$('stressReplay').hidden=false;
+stressPlayback={...createStressDemo(),started:paused?null:performance.now(),epoch:Date.now(),origin:performance.now(),index:0,random:seededRandom(47)};
+status('STRESS DEMO · 1,000 transfers / 100 fictional accounts · 5 minutes in 10 seconds','sim');
+}
+function advanceStress(){
+if(!stressPlayback||stressPlayback.started===null)return;
+const elapsed=stressElapsed();
+while(stressPlayback.index<stressPlayback.events.length&&stressPlayback.events[stressPlayback.index].at<=elapsed){
+const event=stressPlayback.events[stressPlayback.index++];handle(event.message);seen++;lastMsg=timeNow();
+}
+if(elapsed>=stressPlayback.duration&&!stressPlayback.done){stressPlayback.done=true;status('STRESS COMPLETE · 1,000 transfers / 100 fictional accounts · 30× playback','sim')}
+}
+window.starmapStress={
+start(){stop();$('host').value='stress';startStress(false)},
+state(){return stressPlayback?{elapsed:stressElapsed(),events:stressPlayback.index,total:stressPlayback.events.length,accounts:nodes.size,complete:stressElapsed()>=stressPlayback.duration,points:[...nodes.values()].map(p=>({x:p.x,y:p.y,n:p.n})),groups:[...nanoLogoAssignments.values()]}:null}
+};
+$('stressReplay').onclick=()=>window.starmapStress.start();
+const gauss=()=>Math.sqrt(-2*Math.log(1-random()))*Math.cos(6.2832*random());
+function demo(){
+isDemo=true;rpc='';status('simulated data, not the live network','sim');clearAll();
+const hh=()=>{let x='';for(let i=0;i<4;i++)x+=random().toString(16).slice(2,18).padEnd(16,'0');return x.toUpperCase()};
+const fa=()=>'nano_sim'+random().toString(36).slice(2,10)+random().toString(36).slice(2,6);
+const hb=Array.from({length:5},fa),us=Array.from({length:45},fa),faucet=fa(),R=[.001,.01,.05,.1,.5,1,2,5,10,25,100,500];
+const raw=x=>String(Math.round(x*1e6))+'0'.repeat(24);
+const amt=()=>random()<.6?R[(random()**1.5*R.length)|0]:Math.pow(10,-1.5+gauss()*1.1),pick=a=>a[(random()*a.length)|0];
+const send=(s,d,x,open)=>{const h=hh();handle({account:s,amount:raw(x),hash:h,block:{subtype:'send',account:s,link_as_account:d}});
+const dl=random()<.85?800+random()*3200:1e4+random()*3e4;
+setTimeout(()=>{if(isDemo)handle({account:d,amount:raw(x),hash:hh(),block:{subtype:open?'open':'receive',account:d,link:h}})},dl)};
+const one=()=>{const r=random(),u=pick(us);
+if(r<.3)send(u,pick(hb),amt());else if(r<.52)send(pick(hb),u,amt());
+else if(r<.62)send(faucet,fa(),.0001*Math.ceil(random()*9),true);
+else if(r<.66)handle({account:u,amount:raw(amt()),hash:hh(),block:{subtype:'receive',account:u,link:hh()}});
+else if(r<.69)handle({account:u,amount:'0',hash:hh(),block:{subtype:'change',account:u}});
+else send(u,pick(us),amt())};
+const now=timeNow();
+for(let i=0;i<140;i++){const t=now-6e5+i*(6e5/140),r=random();if(r<.4)ingest(pick(us),pick(hb),amt(),t,false);else if(r<.7)ingest(pick(hb),pick(us),amt(),t,false);else ingest(pick(us),pick(us),amt(),t,false)}
+for(let i=0;i<350;i++)layout();
+let nx=now+30e3;
+const tick=()=>{if(!isDemo)return;const t=timeNow();
+if(t>nx){nx=t+45e3;const h=pick(hb);for(let i=0;i<10;i++)setTimeout(()=>{if(isDemo)send(h,fa(),pick([.5,1,1,2]),true)},i*180)}
+one();seen++;lastMsg=t;timer=setTimeout(tick,-Math.log(random())*900)};
+tick()}
+
+function hud(){const now=timeNow();if(!isDemo&&store.length)try{localStorage.setItem('ag-ev',JSON.stringify(store.slice(-600)))}catch(e){};
+const bd=Object.entries(cnt).map(([k,v])=>v+' '+k).join(', ');
+$('stats').textContent=`${nodes.size} accounts, ${edges.size} links, ${nSends} sends in the last ${fd(winMs)}`+
+`\n${nPend} sends seen live not yet seen received`+
+`\nStream: ${lastMsg?Math.round((now-lastMsg)/1e3)+' s since the last message':'no messages yet'}`+(bd?`\nConfirmations seen: ${bd}`:'')+`\nSender lookup for older receives: ${rpc?(rpcFail>=3?'off after errors':'on'):'off, no RPC URL for this node'}`+
+(last?`\nLatest: ${fmt(last.x)}, ${short(last.sa)} to ${short(last.da)}`:'')}
+ $('host').onchange=()=>{clearAll();connect()};
+$('win').onchange=e=>{winMs=+e.target.value*6e4;prune(timeNow())};
+$('snd').onchange=async()=>{
+const checkbox=$('snd'),state=$('audioState');
+if(!checkbox.checked){soundFX.disable();state.textContent='';return}
+checkbox.disabled=true;
+try{await soundFX.enable();soundFX.play({frequency:660,volume:.16});state.textContent='Pitch follows amount.'}
+catch(error){checkbox.checked=false;soundFX.disable();state.textContent=error.message||'Could not enable audio.'}
+finally{checkbox.disabled=false}
+};
+addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
+addEventListener('click',e=>{if(hover&&!e.target.closest('#hud')&&navigator.clipboard){navigator.clipboard.writeText(hover.a).catch(()=>{});floats.push({d:hover,t0:animationNow(),txt:'address copied'})}});
+addEventListener('resize',size);
+setInterval(hud,500);setInterval(resolve,1500);
+const wq=new URLSearchParams(location.search).get('ws');if(/^wss?:\/\//.test(wq||'')){$('host').add(new Option('custom: '+new URL(wq).host,wq),0);$('host').value=wq}
+if(/[?&]demo/.test(location.search))$('host').value='demo';
+if(new URLSearchParams(location.search).has('stress'))$('host').value='stress';
+size();
+if(!/[?&](demo|stress)/.test(location.search)){try{const old=JSON.parse(localStorage.getItem('ag-ev')||'[]'),n0=timeNow()-winMs;for(const[a,b,x,t]of old)if(t>n0){ingest(a,b,x,t,false);store.push([a,b,x,t])}for(let i=0;i<300;i++)layout()}catch(e){}}
+connect();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
