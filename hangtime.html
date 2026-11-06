@@ -4,15 +4,13 @@
 
 :root{color-scheme:dark;--bg:#100d21;--panel:#18142d;--ink:#f2edff;--muted:#aba1c6;--line:#302746;--send:#f6bd75;--receive:#70e3ce;--vote:#c49aff}.visual{background:radial-gradient(ellipse at 70% 25%,#292043,#17132a 70%)}.logo{font-weight:400;font-size:15px}.intro h1{font-family:Georgia,serif;font-style:italic;font-size:58px}.source{background:#302143}.visual,.side,.activity{border-radius:18px}.stat strong{color:var(--send)}</style></head>
 <body><div class="shell"><header><a href="index.html" class="logo">E V E N T S K Y</a><nav aria-label="Visualizer candidates"><a href="constellation.html" >01 Constellation</a><a href="dispatch.html" >02 Dispatch</a><a href="hangtime.html" aria-current="page">03 Hangtime</a><a href="score.html" >04 Score</a></nav><span class="source" id="mode">DEMO / FICTIONAL DATA</span></header>
-<main><section class="intro"><div><div class="kicker">Candidate 03 / Nano network activity</div><h1>Independent events. One network.</h1></div><p>Every mark is a confirmed block. Sends and receives appear independently, positioned by observer receipt time and amount.</p></section>
+<main>
 <div class="controls"><label>Source <select id="feed"><option value="demo">Simulation</option><option value="live">Nano websocket</option></select></label><label class="url">URL <input id="endpoint" aria-label="Nano websocket endpoint" value="wss://ws.nano.to" disabled></label><button class="primary" id="connect">Connect</button><button id="pause">Pause</button><button id="reset">Replay demo</button><label>Speed <select id="speed"><option value="1">1×</option><option value="0.25">¼× demo</option><option value="4">4× demo</option></select></label><button id="export">Export events</button></div>
 <div class="connection" id="connection" role="status"></div>
 <div class="layout"><div><section class="visual"><div class="visual-head"><span>CONFIRMED EVENT SKY</span><span>OBSERVER TIME × AMOUNT</span></div><div class="canvas-wrap"><canvas id="scene" role="img" aria-label="CONFIRMED EVENT SKY. Every mark is a confirmed block. Sends and receives appear independently, positioned by observer receipt time and amount. Select recent blocks with buttons below to inspect details."></canvas></div><div class="legend"><b class="send">■ Final send</b><b class="receive">● Independent receive</b><span>Amount axis logarithmic</span></div></section>
 <div class="stats"><div class="stat"><strong id="sends">0</strong><span>OBSERVED SENDS</span></div><div class="stat"><strong id="receives">0</strong><span>OBSERVED RECEIVES</span></div><div class="stat"><strong id="pending">0</strong><span>OBSERVED BLOCKS</span></div></div>
-<div class="section-label">How to read this view</div><p style="color:var(--muted);font-size:12px;max-width:800px">Marks show the last 60 seconds of confirmed blocks. Horizontal position is observer receipt time; vertical position is amount on a log scale. Receives remain visible whether or not their source sends were observed. This chart does not measure settlement latency.</p>
 <section class="activity"><div class="activity-head"><span>ORV / OBSERVED VOTE ACTIVITY</span><span id="voteCount"></span></div><div class="pulse-strip" id="pulse" aria-label="Vote message counts in one-second bins over the last thirty seconds"></div></section></div>
 <aside class="side"><div><div class="orv-state" id="voteState"></div><h2 style="margin-top:12px">The consensus layer</h2><p id="orvSummary"></p><div id="reps"></div><p>Bars and counts measure vote messages, not delegated voting weight. The endpoint reports each block’s confirmation; quorum is not inferred.</p><h2 style="margin-top:24px">Recent blocks</h2><div id="recent"></div></div><div class="inspect"><h2>Inspect the activity</h2><div id="detail"></div></div></aside></div></main>
-<footer>LOCAL OBSERVER TIME · All drawn blocks are confirmed. Accounts have no geographic position. Earlier history and missed websocket messages are unknown. A cemented send is final. A receive independently credits the destination chain, potentially much later. Missing source history never excludes a receive. Up to 3,000 blocks / 10,000 recorded messages retained in memory. Demo speed affects simulation only. Dissolving marks are leaving the display window; this does not change confirmation or funds. Live websocket availability and vote access depend on the endpoint.</footer></div>
 <script>
 const VIEW = 'hangtime';
 const viewOptions = {};
@@ -21,6 +19,7 @@ const viewOptions = {};
 <script src="js/format.js"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/nano-feed.js"></script>
+<script src="js/page-settings.js"></script>
 <script src="js/visualizer-core.js"></script>
 <script src="js/canvas-view.js"></script>
 <script>

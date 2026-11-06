@@ -4,15 +4,13 @@
 
 :root{color-scheme:dark;--bg:#070e17;--panel:#0b1823;--ink:#e9f4f7;--muted:#8ba5b3;--line:#1e3544;--send:#ffba78;--receive:#64edc8;--vote:#ad9bff}.visual{background:radial-gradient(ellipse at 50% 45%,#102c37,#0b1823 65%)}.intro h1{font-weight:350}.logo{color:var(--receive)}</style></head>
 <body><div class="shell"><header><a href="index.html" class="logo">NANO / ATLAS</a><nav aria-label="Visualizer candidates"><a href="constellation.html" aria-current="page">01 Constellation</a><a href="dispatch.html" >02 Dispatch</a><a href="hangtime.html" >03 Hangtime</a><a href="score.html" >04 Score</a></nav><span class="source" id="mode">DEMO / FICTIONAL DATA</span></header>
-<main><section class="intro"><div><div class="kicker">Candidate 01 / Nano network activity</div><h1>A network of relationships.</h1></div><p>Accounts hold their own chains. Follow the connections between them: amber links show confirmed sends; mint links also have an observed receive reference.</p></section>
+<main>
 <div class="controls"><label>Source <select id="feed"><option value="demo">Simulation</option><option value="live">Nano websocket</option></select></label><label class="url">URL <input id="endpoint" aria-label="Nano websocket endpoint" value="wss://ws.nano.to" disabled></label><button class="primary" id="connect">Connect</button><button id="pause">Pause</button><button id="reset">Replay demo</button><label>Speed <select id="speed"><option value="1">1×</option><option value="0.25">¼× demo</option><option value="4">4× demo</option></select></label><button id="export">Export events</button></div>
 <div class="connection" id="connection" role="status"></div>
 <div class="layout"><div><section class="visual"><div class="visual-head"><span>ACCOUNT CONSTELLATION</span><span>45s TRANSFER WINDOW</span></div><div class="canvas-wrap"><canvas id="scene" role="img" aria-label="ACCOUNT CONSTELLATION. Accounts hold their own chains. Follow the connections between them: amber links show confirmed sends; mint links also have an observed receive reference. Select recent blocks with buttons below to inspect details."></canvas></div><div class="legend"><b class="send">┄ Confirmed send</b><b class="receive">━ Observed source reference</b><span>Link width = log amount</span></div></section>
 <div class="stats"><div class="stat"><strong id="sends">0</strong><span>OBSERVED SENDS</span></div><div class="stat"><strong id="receives">0</strong><span>OBSERVED RECEIVES</span></div><div class="stat"><strong id="pending">0</strong><span>OBSERVED BLOCKS</span></div></div>
-<div class="section-label">How to read this view</div><p style="color:var(--muted);font-size:12px;max-width:800px">Up to 16 active accounts. Positions are a stable circular layout, never locations. Ticks around each account count its blocks in the last minute. Pulses mark observed events; travel speed is ornament.</p>
 <section class="activity"><div class="activity-head"><span>ORV / OBSERVED VOTE ACTIVITY</span><span id="voteCount"></span></div><div class="pulse-strip" id="pulse" aria-label="Vote message counts in one-second bins over the last thirty seconds"></div></section></div>
 <aside class="side"><div><div class="orv-state" id="voteState"></div><h2 style="margin-top:12px">The consensus layer</h2><p id="orvSummary"></p><div id="reps"></div><p>Bars and counts measure vote messages, not delegated voting weight. The endpoint reports each block’s confirmation; quorum is not inferred.</p><h2 style="margin-top:24px">Recent blocks</h2><div id="recent"></div></div><div class="inspect"><h2>Inspect the activity</h2><div id="detail"></div></div></aside></div></main>
-<footer>LOCAL OBSERVER TIME · All drawn blocks are confirmed. Accounts have no geographic position. Earlier history and missed websocket messages are unknown. A cemented send is final. A receive independently credits the destination chain, potentially much later. Missing source history never excludes a receive. Up to 3,000 blocks / 10,000 recorded messages retained in memory. Demo speed affects simulation only. Dissolving marks are leaving the display window; this does not change confirmation or funds. Live websocket availability and vote access depend on the endpoint.</footer></div>
 <script>
 const VIEW = 'constellation';
 const constellationSlots = Array(16).fill(null);
@@ -22,6 +20,7 @@ const viewOptions = {reset: () => constellationSlots.fill(null)};
 <script src="js/format.js"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/nano-feed.js"></script>
+<script src="js/page-settings.js"></script>
 <script src="js/visualizer-core.js"></script>
 <script src="js/canvas-view.js"></script>
 <script>

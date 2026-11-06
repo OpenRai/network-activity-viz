@@ -8,10 +8,10 @@ const pages = [
   'index.html',
   'starmap.html',
   'constellation.html',
-  'dispatch.html',
   'hangtime.html',
   'score.html',
-  'lattice.html'
+  'lattice.html',
+  'send-mountains.html'
 ];
 
 await rm(output, { recursive: true, force: true });

@@ -6,13 +6,12 @@
 :root{color-scheme:dark;--bg:#070d16;--line:#20303e;--muted:#8ea4b5;--send:#ffbb71;--receive:#5df0cc;--vote:#a69aff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#e4edf5;font:14px system-ui}header,main,footer{max-width:1600px;margin:auto;padding:22px 32px}header{display:flex;justify-content:space-between;border-bottom:1px solid var(--line)}.brand{letter-spacing:5px;font-weight:600}.eyebrow,.status{font:11px monospace;letter-spacing:2px;color:var(--receive)}h1{font-size:36px;font-weight:450;margin:12px 0}p{color:var(--muted);line-height:1.6}button,select,input{background:#132330;border:1px solid #354b5d;color:#e4edf5;border-radius:5px;padding:10px;font:12px system-ui}button{cursor:pointer}button:hover{border-color:var(--receive)}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0}input{width:270px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}.panel{background:#0b1521;border:1px solid var(--line);border-radius:9px;overflow:hidden}.heading{display:flex;justify-content:space-between;padding:17px 20px;border-bottom:1px solid var(--line);font:11px monospace;letter-spacing:1px}.legend{display:flex;gap:24px;padding:15px 20px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.send{color:var(--send)}.receive{color:var(--receive)}.vote{color:var(--vote)}#viewport{overflow:auto;max-height:620px}svg{display:block;width:100%;min-width:740px}svg text{font:11px monospace;fill:#a5b9c8}svg .block{cursor:pointer}.note{padding:14px 20px;color:var(--muted);font-size:12px;line-height:1.6;border-top:1px solid var(--line)}.metrics{display:flex;gap:34px;padding:20px}.metrics strong{display:block;font:27px monospace}.metrics small{color:var(--muted);font-size:10px}aside .content{padding:20px}#orv{font-size:12px;line-height:1.6;color:var(--muted)}.rep{padding:9px 0;border-bottom:1px solid var(--line);color:var(--vote);font:11px monospace}#details{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 monospace;color:#b9cfda;margin-top:18px}.badge{padding:5px 9px;background:#172a35;border-radius:4px;font:11px monospace;color:var(--receive)}footer{font-size:11px;color:var(--muted);line-height:1.7}#connection{color:var(--muted);font:12px monospace;min-height:20px;margin-bottom:16px}@media(max-width:1000px){.layout{grid-template-columns:1fr}header,main,footer{padding:20px}h1{font-size:29px}}
 </style>
 <header><div class="brand">◈ LATTICE</div><div id="mode" class="eyebrow">SIMULATION · XNO</div></header>
-<main><div class="eyebrow">THE NANO BLOCK LATTICE</div><h1>Every account has a chain.<br>Every transfer connects two.</h1><p>Read left to right. An amber send leaves one account; a green receive adds it to another.<br>The connecting line shows the time between the two observed blocks.</p>
-<div class="controls"><select id="feed" aria-label="Data source"><option value="sim">Illustrative simulation</option><option value="nanoto">Nano.to websocket</option><option value="custom">Custom websocket</option></select><input id="endpoint" aria-label="Websocket URL" value="wss://ws.nano.to"><button id="connect">Connect</button><button id="pause">Pause view</button><button id="reset">Replay demo</button><select id="speed" aria-label="Demo speed"><option value="1">1× demo speed</option><option value="0.25">¼× demo speed</option><option value="4">4× demo speed</option></select><button id="export">Export recording</button></div>
+<main><div class="controls"><label>Node <select id="feed" aria-label="Node"></select></label></div>
 <div id="connection" role="status">Demo: fictional accounts and votes. Choose a websocket and connect for real confirmations.</div>
 <div class="layout"><section class="panel"><div class="heading"><span>01 / ACCOUNT CHAINS & TRANSFERS</span><span>LAST 60 SECONDS → NOW</span></div><div class="legend"><span class="send">■ Send block</span><span class="receive">● Receive / open block</span><span>◆ Change block</span><span class="send">Each block is independently confirmed</span></div><div id="viewport"><svg id="lattice" role="img" aria-label="Account chains over time with links between send and receive blocks"></svg></div><div class="metrics"><div><strong id="sends">0</strong><small>OBSERVED SENDS</small></div><div><strong id="receives">0</strong><small>OBSERVED RECEIVES</small></div><div><strong id="pending">0</strong><small>OBSERVED BLOCKS</small></div></div><div class="note">Each row is an account, each shape a confirmed block. Horizontal connections follow the block’s previous hash; curved connections pair a receive’s source hash with its send. Dashed chains indicate missing history. Select any block for details.</div></section>
 <aside><section class="panel"><div class="heading">02 / ORV · CONSENSUS</div><div class="content"><span class="badge" id="voteState">SIMULATED VOTES</span><p id="orv">Representatives vote on blocks. Confirmation is the node’s reported outcome.</p><div id="reps"></div><p id="confirmation"></p></div><div class="note">Vote count measures observed activity. Voting weight and quorum require a representative-weight snapshot; neither is inferred from counts.</div></section><section class="panel" style="margin-top:16px"><div class="heading">INSPECT A BLOCK</div><div class="content" id="details">Select a block in the lattice to inspect its account, amount, hash and paired transfer.</div></section></aside></div></main>
-<footer>Times are local observer receipt times. This view begins at connection: earlier sends, receives and chain history are unknown. A cemented send is final; a receive independently credits its destination chain. Missing source history never excludes a receive. Websocket delivery may contain gaps. Live mode draws only confirmed blocks. Account row positions have no geographic meaning. Recording is kept in memory, capped at 10,000 messages.</footer>
 <script src="js/gallery-nav.js"></script>
+<script src="js/page-settings.js"></script>
 <script src="js/format.js"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/nano-feed.js"></script>
@@ -20,7 +19,7 @@
 'use strict';
 let feedClient = null;
 const NS='http://www.w3.org/2000/svg';
-let recording=[],blocks=[],votes=[],seen=new Set(),mode='sim',playing=true,clock=0,last=performance.now(),started=0,connection='Demo ready',selected=null;
+let recording=[],blocks=[],votes=[],seen=new Set(),mode='live',playing=true,clock=0,last=performance.now(),started=0,connection='',selected=null,winMs=gallerySettings.memoryMs;
 const demo=[];
 for(let i=0;i<300;i++){
  const from='Demo account '+String.fromCharCode(65+i%7),to='Demo account '+String.fromCharCode(65+(i%7+1+i%5)%7),hash='demo-send-'+i,amount=String(BigInt(10**(i%5))*10n**28n),time=i*1800;
@@ -42,30 +41,29 @@ function ingest(packet,at){
 }
 function reset(){recording=[];blocks=[];votes=[];seen=new Set();clock=0;demoIndex=0;selected=null;$('details').textContent='Select a block to inspect it.'}
 function disconnect(){feedClient?.stop();feedClient=null}
-$('feed').onchange=()=>{if($('feed').value==='nanoto')$('endpoint').value='wss://ws.nano.to'};
-$('connect').onclick=()=>{
- disconnect();reset();playing=true;$('pause').textContent='Pause view';mode=$('feed').value==='sim'?'sim':'live';
- if(mode==='sim'){connection='Demo: fictional accounts and votes.';return}
- let url;try{url=new URL($('endpoint').value);if(!['ws:','wss:'].includes(url.protocol))throw Error()}catch{connection='Enter a valid ws:// or wss:// URL.';return}
+function startDemo(stress=false){disconnect();reset();playing=true;mode=stress?'stress':'sim';connection=stress?'Stress test · fictional activity':'Simulated data'}
+function connectSelected(){
+ disconnect();reset();playing=true;const choice=$('feed').value;
+ if(choice==='demo'||choice==='stress'){startDemo(choice==='stress');return}
+ mode='live';let url;try{url=new URL(choice)}catch{connection='Choose a valid Nano websocket.';return}
  started=performance.now();
  feedClient=createNanoFeed(url.href,{
   onPacket:packet=>ingest(packet,performance.now()-started),
   onStatus:status=>{connection=status},
   onGap:reason=>{appendBounded(recording,{topic:'observer_gap',observedAt:performance.now()-started,reason},10000)}
- });
-};
-$('pause').onclick=()=>{playing=!playing;$('pause').textContent=playing?'Pause view':'Resume view'};
-$('reset').onclick=()=>{disconnect();mode='sim';$('feed').value='sim';reset();connection='Demo replay';playing=true;$('pause').textContent='Pause view'};
-$('export').onclick=()=>downloadJSON({schema:2,mode,events:recording},'lattice-recording.json');
+});
+}
+gallerySettings.onNodeChange(connectSelected);
+gallerySettings.onMemoryChange(()=>{winMs=gallerySettings.memoryMs;render()});
 function el(tag,attrs={},text){const n=document.createElementNS(NS,tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n}
 function inspect(b){selected=b.hash;const send=blocks.find(s=>s.hash===b.source),receive=blocks.find(r=>r.source===b.hash);$('details').textContent=[b.subtype.toUpperCase()+' · CONFIRMED','Account: '+b.account,'Amount: '+amount(b.amount),'Hash: '+b.hash,'Observed: '+(b.at/1000).toFixed(3)+' s','Confirmation: '+(b.confirmation||'reported by node'),send?'Send → receive: '+((b.at-send.at)/1000).toFixed(3)+' s':receive?'Send → receive: '+((receive.at-b.at)/1000).toFixed(3)+' s':b.subtype==='send'?'Receive not observed in this session.':'Source block not observed in this session.',b.election?'Election info: '+JSON.stringify(b.election):''].filter(Boolean).join('\n')}
 function exitOpacity(at){return Math.min(1,Math.max(0,(60000-clock+at)/2400));}
 function render(){
- $('mode').textContent=(mode==='sim'?'SIMULATION':'LIVE OBSERVER')+' · XNO';$('connection').textContent=connection+(playing?'':' · view paused; live capture continues');
- const shown=blocks.filter(b=>b.at<=clock),recent=shown.filter(b=>b.at>clock-60000),accounts=[...new Set(recent.flatMap(b=>[b.account,...(b.subtype==='send'&&b.destination?[b.destination]:[])]))].slice(-40),W=1100,H=Math.max(420,accounts.length*58+95),x=t=>190+(t-(clock-60000))/60000*850,y=a=>65+accounts.indexOf(a)*58;
+ $('mode').textContent=(mode==='sim'?'SIMULATION':mode==='stress'?'STRESS TEST':'LIVE OBSERVER')+' · XNO';$('connection').textContent=connection;
+ const shown=blocks.filter(b=>b.at<=clock&&b.at>=clock-winMs),recent=shown,accounts=[...new Set(recent.flatMap(b=>[b.account,...(b.subtype==='send'&&b.destination?[b.destination]:[])]))].slice(-40),W=1100,H=Math.max(420,accounts.length*58+95),x=t=>190+(t-(clock-winMs))/winMs*850,y=a=>65+accounts.indexOf(a)*58;
  const svg=$('lattice');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.replaceChildren();
  const defs=el('defs'),marker=el('marker',{id:'arrow',viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:5,markerHeight:5,orient:'auto'});marker.append(el('path',{d:'M 0 0 L 10 5 L 0 10',fill:'#5df0cc'}));defs.append(marker);svg.append(defs);
- for(let s=0;s<=60;s+=10){const px=x(clock-s*1000);svg.append(el('line',{x1:px,x2:px,y1:35,y2:H-25,stroke:'#182b3b'}),el('text',{x:px-12,y:22},s===0?'NOW':'−'+s+'s'))}
+ for(let s=0;s<=6;s++){const px=x(clock-s*winMs/6);svg.append(el('line',{x1:px,x2:px,y1:35,y2:H-25,stroke:'#182b3b'}),el('text',{x:px-12,y:22},s===0?'NOW':'−'+(s*Number($('win').value/6))+'m'))}
  accounts.forEach(a=>{const lastAt=Math.max(...recent.filter(b=>b.account===a||(b.subtype==='send'&&b.destination===a)).map(b=>b.at));const opacity=exitOpacity(lastAt);svg.append(el('line',{x1:190,x2:1040,y1:y(a),y2:y(a),stroke:'#203644',opacity}),el('text',{x:12,y:y(a)+4,opacity},short(a)))});
  const byHash=new Map(shown.map(b=>[b.hash,b]));
  for(const b of recent){if(!accounts.includes(b.account))continue;const px=x(b.at),py=y(b.account),prev=byHash.get(b.previous);
@@ -78,5 +76,5 @@ function render(){
  $('sends').textContent=shown.filter(b=>b.subtype==='send').length;$('receives').textContent=shown.filter(b=>['receive','open'].includes(b.subtype)).length;$('pending').textContent=shown.length;
  const visibleVotes=votes.filter(v=>v.at<=clock&&v.at>clock-10000),counts=new Map();visibleVotes.forEach(v=>counts.set(v.rep,(counts.get(v.rep)||0)+1));$('voteState').textContent=mode==='sim'?'SIMULATED VOTES':votes.length?'VOTES OBSERVED':'VOTE STREAM UNOBSERVED';$('orv').textContent=mode==='live'&&!votes.length?'Confirmation stream only so far. This endpoint may restrict votes. Representative activity and election timing are unknown.':visibleVotes.length+' vote messages observed in the last 10 seconds. Representatives endorse block hashes; the node reports confirmation.';$('reps').replaceChildren();[...counts].sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([rep,count])=>{const d=document.createElement('div');d.className='rep';d.textContent=short(rep)+' · '+count+' votes';$('reps').append(d)});const latest=shown.at(-1);$('confirmation').textContent=latest?'Latest confirmation: '+short(latest.hash)+' · '+(latest.confirmation||'node reported'):'';
 }
-let painted=0;function frame(now){if(playing){if(mode==='sim'){clock+=Math.min(now-last,100)*Number($('speed').value);while(demoIndex<demo.length&&demo[demoIndex].at<=clock){const p=demo[demoIndex++];ingest(p,p.at)}}else clock=now-started}last=now;if(now-painted>80){render();painted=now}requestAnimationFrame(frame)}requestAnimationFrame(frame);
+let painted=0;function frame(now){if(playing){if(mode==='sim'||mode==='stress'){clock+=Math.min(now-last,100)*(mode==='stress'?30:1);while(demoIndex<demo.length&&demo[demoIndex].at<=clock){const p=demo[demoIndex++];ingest(p,p.at)}}else clock=now-started}last=now;if(now-painted>80){render();painted=now}requestAnimationFrame(frame)}connectSelected();requestAnimationFrame(frame);
 </script></html>

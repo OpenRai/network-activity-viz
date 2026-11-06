@@ -6,10 +6,10 @@ A collection of independent, live-capable visualizations of Nano network activit
 
 - **Starmap** — active accounts and observed transfers in a constellation view.
 - **Constellation** — account relationships and transfer links.
-- **Dispatch** — recent transaction activity.
 - **Hangtime** — independent send and receive observations over time.
 - **Score** — account-chain activity.
 - **Lattice** — blocks arranged along account chains.
+- **Send mountains** — confirmed send amounts as a live density landscape.
 
 The visualizations can run in demo mode or connect to supported Nano websocket feeds. Live timestamps represent the local observer's receipt time; a feed may restrict topics or all-account subscriptions.
 

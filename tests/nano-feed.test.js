@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
-const pages=['index','constellation','dispatch','hangtime','score','starmap'];
+const pages=['index','constellation','hangtime','score','lattice','starmap'];
 const source=readFileSync(root+'js/nano-feed.js','utf8');
 function harness(endpoint='wss://test.example/ws'){
  let now=0,id=0;const timers=new Map(),sockets=[],statuses=[],packets=[],gaps=[];

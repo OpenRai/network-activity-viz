@@ -1,7 +1,7 @@
 /* Shared data, simulation, controls, and panels for the four canvas candidates. */
 'use strict';
 let feedClient = null;
-const state = { mode:'demo', time:VIEW==='score'?60000:14000, playing:true, blocks:[], votes:[], recording:[], seen:new Set(), selected:null, accountOrder:new Map(), status:'Illustrative demo · fictional accounts and representatives', started:0, demoIndex:0 };
+const state = { mode:'demo', time:VIEW==='score'?60000:14000, windowMs:globalThis.gallerySettings?.memoryMs||30*60000, playing:true, blocks:[], votes:[], recording:[], seen:new Set(), selected:null, accountOrder:new Map(), status:'', started:0, demoIndex:0 };
 const demo = [];
 const names = ['Atlas','Birch','Cedar','Delta','Ember','Fern','Grove','Harbor','Iris','Juniper','Kite','Lumen'];
 for (let i=0; i<1200; i++) {
@@ -52,14 +52,12 @@ function rememberBlock(block){
 function advanceDemo(){while(state.demoIndex<demo.length&&demo[state.demoIndex].at<=state.time){const event=demo[state.demoIndex++];ingest(event,event.at)}}
 function clearRecording(){viewOptions.reset?.();visualItems.clear();state.blocks=[];state.votes=[];state.recording=[];state.seen.clear();state.accountOrder.clear();state.selected=null;state.demoIndex=0;state.time=0;}
 function disconnect(){feedClient?.stop();feedClient=null}
-function startDemo(){disconnect();clearRecording();state.mode='demo';state.time=VIEW==='score'?60000:14000;state.playing=true;state.status='Illustrative demo · '+(state.time/1000)+'-second recorded lead-in · fictional accounts and votes';$('feed').value='demo';$('pause').textContent='Pause';advanceDemo();render();}
-$('reset').onclick=startDemo;
-$('pause').onclick=()=>{state.playing=!state.playing;$('pause').textContent=state.playing?'Pause':'Resume';render()};
-$('feed').onchange=()=>{$('endpoint').disabled=$('feed').value==='demo'};
-$('connect').onclick=()=>{
-  if($('feed').value==='demo'){startDemo();return}
-  let url;try{url=new URL($('endpoint').value);if(!['ws:','wss:'].includes(url.protocol))throw Error('protocol')}catch{state.status='Enter a valid ws:// or wss:// endpoint.';render();return}
-  disconnect();clearRecording();state.mode='live';state.playing=true;$('pause').textContent='Pause';state.started=performance.now();state.status='Connecting to '+url.host+'…';
+function startDemo(stress=false){disconnect();clearRecording();state.mode=stress?'stress':'demo';state.time=stress?0:VIEW==='score'?60000:14000;state.playing=true;state.status=stress?'Stress test · fictional activity':'Simulated data';advanceDemo();render();}
+function connectSelected(){
+  const selected=$('feed').value;
+  if(selected==='demo'||selected==='stress'){startDemo(selected==='stress');return}
+  let url;try{url=new URL(selected);if(!['ws:','wss:'].includes(url.protocol))throw Error('protocol')}catch{state.status='Choose a valid Nano websocket.';render();return}
+  disconnect();clearRecording();state.mode='live';state.playing=true;state.started=performance.now();state.status='Connecting to '+url.host+'…';
   feedClient=createNanoFeed(url.href,{
     onPacket:packet=>ingest(packet,performance.now()-state.started),
     onStatus:status=>{state.status=status},
@@ -68,25 +66,23 @@ $('connect').onclick=()=>{
     }
   });
   render();
-};
-$('export').onclick=()=>{
- downloadJSON({schema:3,mode:state.mode,observerTime:'milliseconds since session start',events:state.recording},'nano-'+VIEW+'-events.json');
-};
+}
+if(globalThis.gallerySettings){gallerySettings.onNodeChange(connectSelected);gallerySettings.onMemoryChange(()=>{state.windowMs=gallerySettings.memoryMs;render()});}
 const short = shortAccount;
 const amount = formatNanoAmount;
 function logAmount(raw){try{const s=BigInt(raw).toString();if(s==='0')return -8;return s.length-1-30+Math.log10(Number(s.slice(0,12))/10**(Math.min(s.length,12)-1))}catch{return -8}}
 function seconds(ms){return (ms/1000).toFixed(ms<10000?1:0)+'s'}
 function model(){
- const blocks=state.blocks.filter(b=>b.at<=state.time),byHash=new Map(blocks.map(b=>[b.hash,b]));
+ const blocks=state.blocks.filter(b=>b.at<=state.time&&b.at>=state.time-state.windowMs),byHash=new Map(blocks.map(b=>[b.hash,b]));
  const receives=new Map(blocks.filter(b=>['receive','open'].includes(b.subtype)).map(b=>[b.source,b]));
  const transfers=blocks.filter(b=>b.subtype==='send').map(send=>({send,receive:receives.get(send.hash)}));
- const votes=state.votes.filter(v=>v.at<=state.time),recent=blocks.filter(b=>b.at>=state.time-60000);
+ const votes=state.votes.filter(v=>v.at<=state.time&&v.at>=state.time-state.windowMs),recent=blocks.filter(b=>b.at>=state.time-60000);
  return {blocks,byHash,receives,transfers,votes,recent};
 }
 function inspect(block){state.selected=block.hash;render()}
 function updatePanels(m){
- $('mode').textContent=state.mode==='demo'?'DEMO / FICTIONAL DATA':'LIVE / OBSERVER DATA';
- $('connection').textContent=state.status+(state.playing?'':' · VIEW PAUSED'+(state.mode==='live'?' / capture continues':''));
+ $('mode').textContent=state.mode==='live'?'LIVE / OBSERVER DATA':state.mode==='stress'?'STRESS TEST / FICTIONAL DATA':'SIMULATED DATA';
+ $('connection').textContent=state.status;
  $('sends').textContent=m.transfers.length;$('receives').textContent=m.blocks.filter(b=>['receive','open'].includes(b.subtype)).length;$('pending').textContent=m.blocks.length;
  updateConsensusPanel(m);
  updateBlockDetails(m);

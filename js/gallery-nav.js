@@ -2,10 +2,10 @@
   const pages = [
     { href: 'starmap.html', name: 'Starmap', detail: 'Account constellation' },
     { href: 'constellation.html', name: 'Constellation', detail: 'Account links' },
-    { href: 'dispatch.html', name: 'Dispatch', detail: 'Transfer activity' },
     { href: 'hangtime.html', name: 'Hangtime', detail: 'Send and receive timing' },
     { href: 'score.html', name: 'Score', detail: 'Account chains' },
-    { href: 'lattice.html', name: 'Lattice', detail: 'Block lattice' }
+    { href: 'lattice.html', name: 'Lattice', detail: 'Block lattice' },
+    { href: 'send-mountains.html', name: 'Send mountains', detail: 'Amount landscape' }
   ];
   const current = location.pathname.split('/').pop() || 'index.html';
   const style = document.createElement('style');

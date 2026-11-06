@@ -43,7 +43,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <option value="stress">Stress demo · 30×</option><option value="demo">Simulated data</option></select></label>
 <label class="r">Memory <select id="win"><option value="10">10 minutes</option><option value="30" selected>30 minutes</option><option value="60">60 minutes</option></select></label>
 <button id="stressReplay" type="button" hidden>Replay 10-second stress demo</button>
-<label class="r" for="snd"><span>SoundFX</span><input id="snd" type="checkbox" aria-describedby="audioState"></label>
+<label class="r" for="snd"><span>SoundFX</span><input id="snd" type="checkbox" checked aria-describedby="audioState"></label>
+<label class="r">Sound set <select id="soundSet"><option value="air">Air chimes</option><option value="aurora">Aurora silk</option><option value="ascent">Starlight ascent · arpeggio</option><option value="cascade">Moonlit cascade · arpeggio</option><option value="choir">Distant choir</option><option value="velvet">Velvet nebula</option><option value="orbit">Orbital shimmer</option></select></label>
 <div id="audioState" class="n" role="status"></div>
 <div id="stats"></div>
 <div class="n reading">
@@ -67,6 +68,10 @@ const RPCS={'ws.nano.to':'https://rpc.nano.to','rainstorm.city':'https://rainsto
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 let W=1,H=1,dpr=1,winMs=30*6e4,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
 const soundFX=createSoundFX();
+const soundSet=$('soundSet');
+try{const saved=localStorage.getItem('ag-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
+soundFX.setSoundSet(soundSet.value);
+soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('ag-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
 let stressPlayback=null;
 const timeScale=()=>stressPlayback?30:1;
 const stressTime=()=>stressPlayback.started===null?0:Math.min(stressPlayback.duration+8000,(performance.now()-stressPlayback.started)*30);
@@ -102,14 +107,15 @@ const s=node(sa),d=node(da,s),e=getEdge(s,d);
 e.ts.push(t);e.am.push(x);s.n++;d.n++;s.last=d.last=t;nSends++;last={sa,da,x};
 if(anim){if(!isDemo){store.push([sa,da,x,t]);if(store.length>1200)store.splice(0,store.length-600)}
 if(hash){e.pend++;sendBy.set(hash,{e,t,x,r:false});if(sendBy.size>5000)sendBy.delete(sendBy.keys().next().value)}
-const la=Math.log10(x);comets.push({s,d,t0:animationNow(),du:RM?1:850+random()*300,la,x,kind:'send'});s.pulse=1;blip(la)}}
+const la=Math.log10(x);comets.push({s,d,t0:animationNow(),du:RM?1:850+random()*300,la,x,kind:'send'});s.pulse=1;blip(la,.1,1,sa)}}
 function land(a,src,x,t,isOpen){
 x=x>0?x:0;const kind=isOpen?'open':'receive',la=x>0?Math.log10(x):-2,h=src&&sendBy.get(src),tag=isOpen?', new account':'';
 if(h&&!h.r&&h.e.d.a===a&&edges.get(h.e.s.a+'>'+a)===h.e){h.r=true;if(h.e.pend>0)h.e.pend--;h.e.d.last=t;h.e.d.pulse=1;
-comets.push({s:h.e.s,d:h.e.d,t0:animationNow(),du:RM?1:700,la,x:h.x,kind,txt:fmt(h.x)+tag+', received after '+fd(t-h.t)});blip(la,.05,.5);return}
+comets.push({s:h.e.s,d:h.e.d,t0:animationNow(),du:RM?1:700,la,x:h.x,kind,txt:fmt(h.x)+tag+', received after '+fd(t-h.t)});blip(la,.05,.5,a);return}
 const r=node(a),an=random()*6.283;r.k.push(t);r.n++;r.last=t;
-comets.push({s:{x:r.x+Math.cos(an)*240,y:r.y+Math.sin(an)*240},d:r,t0:animationNow(),du:RM?1:1100,la,x,kind,txt:fmt(x)+tag+', received'});
-blip(la,.05,.5);
+const flightDuration=RM?1:1100;
+comets.push({s:{x:r.x+Math.cos(an)*240,y:r.y+Math.sin(an)*240},d:r,t0:animationNow(),du:flightDuration,la,x,kind,txt:fmt(x)+tag+', received'});
+soundFX.play({frequency:196*2**(clamp((la+8)/13,0,1)*3),volume:.09,outside:true,duration:flightDuration/1000,account:a});
 if(src&&rpc&&rpcFail<3){want.set(src,{r,t,x});if(want.size>500)want.delete(want.keys().next().value)}}
 function mark(a,kind,t){const p=node(a);p.k.push(t);p.n++;p.last=t;p.pulse=1;
 if(bursts.length<120)bursts.push({d:p,t0:animationNow(),la:-2,kind});if(floats.length<60)floats.push({d:p,t0:animationNow(),txt:kind==='change'?'representative change':'epoch upgrade',kind})}
@@ -162,7 +168,7 @@ if(edges.size){for(const[k]of[...edges.entries()].sort((a,b)=>a[1].ts[a[1].ts.le
 else for(const p of[...nodes.values()].sort((a,b)=>a.last-b.last).slice(0,40))nodes.delete(p.a)}
 hubs=[...nodes.values()].filter(p=>p.n>=3).sort((a,b)=>b.n-a.n).slice(0,7)}
 
-function blip(la,v=.1,pf=1){soundFX.play({frequency:196*pf*2**(clamp((la+8)/13,0,1)*3),volume:v})}
+function blip(la,v=.1,pf=1,account=''){soundFX.play({frequency:196*pf*2**(clamp((la+8)/13,0,1)*3),volume:v,account})}
 
 function fitCamera(){
 if(nodes.size){let a=1e9,b=-1e9,c=1e9,d=-1e9;for(const p of nodes.values()){if(p.x<a)a=p.x;if(p.x>b)b=p.x;if(p.y<c)c=p.y;if(p.y>d)d=p.y}
@@ -299,11 +305,13 @@ $('win').onchange=e=>{winMs=+e.target.value*6e4;prune(timeNow())};
 $('snd').onchange=async()=>{
 const checkbox=$('snd'),state=$('audioState');
 if(!checkbox.checked){soundFX.disable();state.textContent='';return}
-checkbox.disabled=true;
-try{await soundFX.enable();soundFX.play({frequency:660,volume:.16});state.textContent='Pitch follows amount.'}
-catch(error){checkbox.checked=false;soundFX.disable();state.textContent=error.message||'Could not enable audio.'}
-finally{checkbox.disabled=false}
+try{await soundFX.enable();state.textContent='SoundFX enabled · pitch follows amount.';soundFX.play({frequency:440,volume:.12})}
+catch{state.textContent='SoundFX is on · click or press a key to enable audio.'}
 };
+async function resumeSoundAfterGesture(){if(!$('snd').checked)return;try{await soundFX.enable();$('audioState').textContent='SoundFX enabled · pitch follows amount.'}catch{}}
+addEventListener('pointerdown',resumeSoundAfterGesture,{once:true});
+addEventListener('keydown',resumeSoundAfterGesture,{once:true});
+if($('snd').checked)resumeSoundAfterGesture();
 addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 addEventListener('click',e=>{if(hover&&!e.target.closest('#hud')&&navigator.clipboard){navigator.clipboard.writeText(hover.a).catch(()=>{});floats.push({d:hover,t0:animationNow(),txt:'address copied'})}});
 addEventListener('resize',size);

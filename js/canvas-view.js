@@ -85,7 +85,7 @@ function render(){
 }
 if($('viewMode'))$('viewMode').onchange=()=>{visualItems.clear();render()};
 let previous=performance.now(),painted=0;
-function frame(now){if(state.playing){if(state.mode==='demo'){state.time+=Math.min(now-previous,150)*Number($('speed').value);advanceDemo();if(state.demoIndex===demo.length){state.playing=false;$('pause').textContent='Resume';state.status='Demo recording ended · Replay to restart'}}else state.time=now-state.started}previous=now;if(now-painted>30){render();painted=now}requestAnimationFrame(frame)}
-function startVisualizer(){advanceDemo();render();requestAnimationFrame(frame);}
+function frame(now){if(state.playing){if(state.mode==='demo'||state.mode==='stress'){state.time+=Math.min(now-previous,150)*(state.mode==='stress'?30:1);advanceDemo();if(state.demoIndex===demo.length){state.playing=false;state.status='Simulation ended · select a node to restart'}}else state.time=now-state.started}previous=now;if(now-painted>30){render();painted=now}requestAnimationFrame(frame)}
+function startVisualizer(){connectSelected();requestAnimationFrame(frame);}
 
 
