@@ -34,8 +34,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 </head>
 <body>
 <canvas id="c"></canvas><canvas id="t"></canvas><canvas id="o"></canvas>
-<div id="hud">
-<h1>Account galaxy</h1>
+<details id="hud">
+<summary><h1>Account galaxy</h1></summary>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
 <label class="r">Node <select id="host">
 <option value="wss://ws.nano.to">Nano.to</option>
@@ -52,7 +52,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <p><strong class="activity">Size</strong> tells activity.<br><strong class="recency">Colour</strong> tells recency.</p>
 <p>Hover to <strong>discover.</strong></p>
 </div>
-</div>
+</details>
+<script src="js/hud-card.js"></script>
 <script src="js/gallery-nav.js"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/nano-feed.js"></script>

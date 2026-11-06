@@ -35,8 +35,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 </head>
 <body>
 <canvas id="c"></canvas><canvas id="o"></canvas>
-<div id="hud">
-<h1>Send mountains</h1>
+<details id="hud">
+<summary><h1>Send mountains</h1></summary>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
 <div class="controls"><label>Node <select id="feed"></select></label></div>
 <label class="r">SoundFX <input id="snd" type="checkbox" checked aria-describedby="audioState"></label>
@@ -47,7 +47,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <canvas id="lg" width="256" height="8"></canvas>
 <div class="r n"><span>0</span><span id="mx"></span></div>
 <div class="marker-key"><span class="send"><i></i>Send</span><span class="receive"><i></i>Receive</span></div>
-</div>
+</details>
+<script src="js/hud-card.js"></script>
 <script src="js/gallery-nav.js"></script>
 <script src="js/page-settings.js"></script>
 <script src="js/event-utils.js"></script>
