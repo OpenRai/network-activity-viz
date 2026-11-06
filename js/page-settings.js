@@ -11,7 +11,7 @@
   let stored;
   try { stored = localStorage.getItem('nano-gallery-node'); } catch {}
   node.replaceChildren(...hosts.map(([value, label]) => new Option(label, value)));
-  node.value = hosts.some(([value]) => value === stored) ? stored : hosts[0][0];
+  node.value = hosts.slice(0, 2).some(([value]) => value === stored) ? stored : hosts[0][0];
   node.setAttribute('aria-label', 'Node');
   let nodeLabel = node.closest('label');
   if (!nodeLabel) {
@@ -36,7 +36,7 @@
 
   window.gallerySettings = {
     get memoryMs() { return Number(memory.value) * 60000; },
-    saveNode() { try { localStorage.setItem('nano-gallery-node', node.value); } catch {} },
+    saveNode() { try { if (['demo','stress'].includes(node.value)) localStorage.removeItem('nano-gallery-node'); else localStorage.setItem('nano-gallery-node', node.value); } catch {} },
     onMemoryChange(callback) { memory.addEventListener('change', callback); },
     onNodeChange(callback) { node.addEventListener('change', callback); }
   };

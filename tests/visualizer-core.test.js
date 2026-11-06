@@ -17,3 +17,17 @@ test('receives from outside the recording survive parsing and remain visible',()
  const c=harness();c.ingest({topic:'confirmation',message:{hash:'RECEIVE',account:'nano_destination',amount:'100',block:JSON.stringify({subtype:'receive',link:'OLD_SEND'})}},20);
  const m=c.model();expect(m.blocks.length).toBe(1);expect(m.transfers.length).toBe(0);expect(m.receives.get('OLD_SEND').hash).toBe('RECEIVE');
 });
+test('live startup never advances the synthetic event stream',()=>{
+ const c=harness();vm.runInContext('state.time=60000;advanceDemo()',c);
+ expect(vm.runInContext('state.mode',c)).toBe('live');
+ expect(c.model().blocks).toHaveLength(0);
+ expect(c.model().votes).toHaveLength(0);
+});
+test('stress vote messages are explicitly labeled simulated',()=>{
+ const c=harness(),elements=new Map();
+ c.$=id=>{if(!elements.has(id))elements.set(id,{replaceChildren(){}});return elements.get(id)};
+ vm.runInContext("state.mode='stress'",c);
+ c.updateConsensusPanel({votes:[]});
+ expect(elements.get('voteState').textContent).toContain('SIMULATED');
+ expect(elements.get('orvSummary').textContent).toContain('simulated vote messages');
+});

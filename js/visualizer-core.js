@@ -1,7 +1,7 @@
 /* Shared data, simulation, controls, and panels for the four canvas candidates. */
 'use strict';
 let feedClient = null;
-const state = { mode:'demo', time:VIEW==='score'?60000:14000, windowMs:globalThis.gallerySettings?.memoryMs||30*60000, playing:true, blocks:[], votes:[], recording:[], seen:new Set(), selected:null, accountOrder:new Map(), status:'', started:0, demoIndex:0 };
+const state = { mode:'live', time:0, windowMs:globalThis.gallerySettings?.memoryMs||30*60000, playing:true, blocks:[], votes:[], recording:[], seen:new Set(), selected:null, accountOrder:new Map(), status:'', started:0, demoIndex:0 };
 const demo = [];
 const names = ['Atlas','Birch','Cedar','Delta','Ember','Fern','Grove','Harbor','Iris','Juniper','Kite','Lumen'];
 for (let i=0; i<1200; i++) {
@@ -49,7 +49,7 @@ function rememberBlock(block){
   // Account placement only needs accounts represented in retained history.
   if(state.accountOrder.size>6000){const retained=new Set(state.blocks.flatMap(b=>[b.account,b.destination]).filter(Boolean));state.accountOrder=new Map([...state.accountOrder].filter(([a])=>retained.has(a)));}
 }
-function advanceDemo(){while(state.demoIndex<demo.length&&demo[state.demoIndex].at<=state.time){const event=demo[state.demoIndex++];ingest(event,event.at)}}
+function advanceDemo(){if(!['demo','stress'].includes(state.mode))return;while(state.demoIndex<demo.length&&demo[state.demoIndex].at<=state.time){const event=demo[state.demoIndex++];ingest(event,event.at)}}
 function clearRecording(){viewOptions.reset?.();visualItems.clear();state.blocks=[];state.votes=[];state.recording=[];state.seen.clear();state.accountOrder.clear();state.selected=null;state.demoIndex=0;state.time=0;}
 function disconnect(){feedClient?.stop();feedClient=null}
 function startDemo(stress=false){disconnect();clearRecording();state.mode=stress?'stress':'demo';state.time=stress?0:VIEW==='score'?60000:14000;state.playing=true;state.status=stress?'Stress test · fictional activity':'Simulated data';advanceDemo();render();}
@@ -92,8 +92,8 @@ function updatePanels(m){
 function updateConsensusPanel(m){
  const recentVotes=m.votes.filter(v=>v.at>state.time-10000),repCounts=new Map();
  recentVotes.forEach(v=>repCounts.set(v.rep,(repCounts.get(v.rep)||0)+1));
- $('voteState').textContent=state.mode==='demo'?'SIMULATED ORV':m.votes.length?'VOTE MESSAGES OBSERVED':'VOTE STREAM UNOBSERVED';
- $('orvSummary').textContent=state.mode==='live'&&!m.votes.length?'No vote messages received. This endpoint may expose confirmations only.':recentVotes.length+' vote messages / last 10s · '+repCounts.size+' representatives';
+ $('voteState').textContent=state.mode!=='live'?'SIMULATED VOTES · '+(state.mode==='stress'?'STRESS TEST':'DEMO'):m.votes.length?'VOTE MESSAGES OBSERVED':'VOTE STREAM UNOBSERVED';
+ $('orvSummary').textContent=state.mode==='live'&&!m.votes.length?'No vote messages received from the selected node.':recentVotes.length+(state.mode==='live'?' vote messages':' simulated vote messages')+' / last 10s · '+repCounts.size+' representatives';
  $('reps').replaceChildren();
  for(const [rep,count]of [...repCounts].sort((a,b)=>b[1]-a[1]).slice(0,4)){
   const row=document.createElement('div');row.className='rep';const name=document.createElement('span');name.textContent=short(rep);const val=document.createElement('span');val.textContent=count+' votes';row.append(name,val);$('reps').append(row);
@@ -125,5 +125,5 @@ function updateRecentBlocks(m){
 }
 function updateVotePulse(m){
  const strip=$('pulse');strip.replaceChildren();for(let i=29;i>=0;i--){const end=state.time-i*1000,count=m.votes.filter(v=>v.at>end-1000&&v.at<=end).length;const bar=document.createElement('i');bar.style.height=Math.min(28,2+count*1.8)+'px';bar.title=count+' vote messages';strip.append(bar)}
- $('voteCount').textContent=m.votes.filter(v=>v.at>state.time-30000).length+' messages / 30s';
+ $('voteCount').textContent=m.votes.filter(v=>v.at>state.time-30000).length+(state.mode==='live'?' messages':' simulated messages')+' / 30s';
 }
