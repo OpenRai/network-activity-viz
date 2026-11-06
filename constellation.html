@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Accounts hold their own chains. Follow the connections between them: amber links show confirmed sends; mint links also have an observed receive reference."><title>Constellation · Nano visualizer 01</title><style>
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,sans-serif}button,input,select{font:inherit;color:inherit}button,a,input,select{outline-offset:4px}button,select,input{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:8px 12px}button{cursor:pointer}button:hover{border-color:var(--receive)}button.primary{background:var(--receive);color:var(--bg);font-weight:650}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline}.shell{max-width:1600px;margin:auto;padding:0 36px}header{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.logo{font-size:19px;letter-spacing:4px;font-weight:700}nav{display:flex;gap:18px;color:var(--muted);font:11px monospace}nav a[aria-current]{color:var(--ink)}.source{font:11px monospace;letter-spacing:1px;background:var(--line);padding:6px 10px;border-radius:20px}.intro{display:flex;align-items:flex-end;justify-content:space-between;padding:32px 0 24px;gap:30px}.kicker,.section-label{font:11px monospace;text-transform:uppercase;letter-spacing:2px;color:var(--muted)}h1{font-size:clamp(32px,3.5vw,55px);font-weight:500;letter-spacing:-2px;line-height:1.1;margin:12px 0}.intro p{max-width:470px;color:var(--muted);margin:0}.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--line)}.controls label{display:flex;align-items:center;gap:7px;font:11px monospace;color:var(--muted)}.controls input{width:270px;font:11px monospace}.connection{font:11px monospace;color:var(--muted);min-height:30px;padding:4px 0 12px;overflow-wrap:anywhere}.layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:20px}.visual,.side,.activity{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}.visual-head{display:flex;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);font:11px monospace;gap:12px}.visual-head span:last-child{color:var(--muted)}.canvas-wrap{position:relative}canvas{display:block;width:100%;height:480px;touch-action:pan-y}.legend{padding:14px 20px;display:flex;flex-wrap:wrap;gap:18px;border-top:1px solid var(--line);font:11px monospace;color:var(--muted)}.legend b{font-weight:400}.send{color:var(--send)}.receive{color:var(--receive)}.vote{color:var(--vote)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px 0 25px}.stat{border-left:1px solid var(--line);padding-left:20px}.stat strong{font:30px monospace;display:block}.stat span{font:10px monospace;letter-spacing:1px;color:var(--muted)}.side{padding:20px;align-self:start}.side h2{font-size:14px;font-weight:550;margin:0 0 12px}.side p{color:var(--muted);font-size:12px}.rep{display:flex;justify-content:space-between;font:11px monospace;border-bottom:1px solid var(--line);padding:10px 0;gap:8px}.bar{height:3px;background:var(--vote);margin-top:4px;border-radius:2px}.orv-state{color:var(--vote);font:10px monospace;letter-spacing:1px}.inspect{border-top:1px solid var(--line);margin-top:22px;padding-top:20px}#detail{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.8 monospace;color:var(--muted)}#recent{display:grid;gap:6px;max-height:200px;overflow:auto}.recent-button{padding:7px 9px;text-align:left;font:11px monospace;border-color:var(--line);background:transparent}.activity{margin-top:18px;padding:16px 20px}.activity-head{display:flex;justify-content:space-between;font:11px monospace;color:var(--muted)}.pulse-strip{display:flex;height:28px;gap:4px;align-items:end;margin-top:10px}.pulse-strip i{background:var(--vote);flex:1;min-height:2px;opacity:.7}footer{font:10px/1.8 monospace;color:var(--muted);border-top:1px solid var(--line);padding:18px 0 28px;margin-top:24px}#viewMode{max-width:180px}.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--send);margin-right:6px}@media(max-width:1000px){.layout{grid-template-columns:minmax(0,1fr) 245px}.shell{padding:0 20px}.intro{align-items:start;flex-direction:column;gap:10px}.intro p{max-width:650px}nav{gap:10px}.source{display:none}}@media(max-width:760px){header{height:auto;padding:18px 0;gap:15px;flex-wrap:wrap}nav{flex-wrap:wrap;font-size:10px}.layout{grid-template-columns:1fr}canvas{height:450px}.side{display:grid;grid-template-columns:1fr 1fr;gap:20px}.inspect{border:0;margin:0;padding:0}.stats{gap:5px}.stat{padding-left:10px}.stat strong{font-size:24px}.controls input{width:100%;max-width:100%}.controls label.url{width:100%}.shell{padding:0 14px}.visual-head{padding:14px 12px}.legend{gap:12px;padding:14px 12px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+
+:root{color-scheme:dark;--bg:#070e17;--panel:#0b1823;--ink:#e9f4f7;--muted:#8ba5b3;--line:#1e3544;--send:#ffba78;--receive:#64edc8;--vote:#ad9bff}.visual{background:radial-gradient(ellipse at 50% 45%,#102c37,#0b1823 65%)}.intro h1{font-weight:350}.logo{color:var(--receive)}</style></head>
+<body><div class="shell"><header><a href="index.html" class="logo">NANO / ATLAS</a><nav aria-label="Visualizer candidates"><a href="constellation.html" aria-current="page">01 Constellation</a><a href="dispatch.html" >02 Dispatch</a><a href="hangtime.html" >03 Hangtime</a><a href="score.html" >04 Score</a></nav><span class="source" id="mode">DEMO / FICTIONAL DATA</span></header>
+<main><section class="intro"><div><div class="kicker">Candidate 01 / Nano network activity</div><h1>A network of relationships.</h1></div><p>Accounts hold their own chains. Follow the connections between them: amber links show confirmed sends; mint links also have an observed receive reference.</p></section>
+<div class="controls"><label>Source <select id="feed"><option value="demo">Simulation</option><option value="live">Nano websocket</option></select></label><label class="url">URL <input id="endpoint" aria-label="Nano websocket endpoint" value="wss://ws.nano.to" disabled></label><button class="primary" id="connect">Connect</button><button id="pause">Pause</button><button id="reset">Replay demo</button><label>Speed <select id="speed"><option value="1">1×</option><option value="0.25">¼× demo</option><option value="4">4× demo</option></select></label><button id="export">Export events</button></div>
+<div class="connection" id="connection" role="status"></div>
+<div class="layout"><div><section class="visual"><div class="visual-head"><span>ACCOUNT CONSTELLATION</span><span>45s TRANSFER WINDOW</span></div><div class="canvas-wrap"><canvas id="scene" role="img" aria-label="ACCOUNT CONSTELLATION. Accounts hold their own chains. Follow the connections between them: amber links show confirmed sends; mint links also have an observed receive reference. Select recent blocks with buttons below to inspect details."></canvas></div><div class="legend"><b class="send">┄ Confirmed send</b><b class="receive">━ Observed source reference</b><span>Link width = log amount</span></div></section>
+<div class="stats"><div class="stat"><strong id="sends">0</strong><span>OBSERVED SENDS</span></div><div class="stat"><strong id="receives">0</strong><span>OBSERVED RECEIVES</span></div><div class="stat"><strong id="pending">0</strong><span>OBSERVED BLOCKS</span></div></div>
+<div class="section-label">How to read this view</div><p style="color:var(--muted);font-size:12px;max-width:800px">Up to 16 active accounts. Positions are a stable circular layout, never locations. Ticks around each account count its blocks in the last minute. Pulses mark observed events; travel speed is ornament.</p>
+<section class="activity"><div class="activity-head"><span>ORV / OBSERVED VOTE ACTIVITY</span><span id="voteCount"></span></div><div class="pulse-strip" id="pulse" aria-label="Vote message counts in one-second bins over the last thirty seconds"></div></section></div>
+<aside class="side"><div><div class="orv-state" id="voteState"></div><h2 style="margin-top:12px">The consensus layer</h2><p id="orvSummary"></p><div id="reps"></div><p>Bars and counts measure vote messages, not delegated voting weight. The endpoint reports each block’s confirmation; quorum is not inferred.</p><h2 style="margin-top:24px">Recent blocks</h2><div id="recent"></div></div><div class="inspect"><h2>Inspect the activity</h2><div id="detail"></div></div></aside></div></main>
+<footer>LOCAL OBSERVER TIME · All drawn blocks are confirmed. Accounts have no geographic position. Earlier history and missed websocket messages are unknown. A cemented send is final. A receive independently credits the destination chain, potentially much later. Missing source history never excludes a receive. Up to 3,000 blocks / 10,000 recorded messages retained in memory. Demo speed affects simulation only. Dissolving marks are leaving the display window; this does not change confirmation or funds. Live websocket availability and vote access depend on the endpoint.</footer></div>
+<script>
+const VIEW = 'constellation';
+const constellationSlots = Array(16).fill(null);
+const viewOptions = {reset: () => constellationSlots.fill(null)};
+</script>
+<script src="js/gallery-nav.js"></script>
+<script src="js/format.js"></script>
+<script src="js/event-utils.js"></script>
+<script src="js/nano-feed.js"></script>
+<script src="js/visualizer-core.js"></script>
+<script src="js/canvas-view.js"></script>
+<script>
+function draw(m,w,h){
+ const recentTransfers=m.transfers.filter(t=>t.send.at>state.time-45000),active=new Set(m.recent.flatMap(b=>[b.account,b.subtype==='send'?b.destination:'']).filter(Boolean));
+ // Keep each account in its slot through its dissolution, then admit new activity.
+ for(let i=0;i<constellationSlots.length;i++){
+   const slot=constellationSlots[i];if(!slot)continue;
+   if(active.has(slot.account))slot.retiredAt=null;
+   else if(slot.retiredAt===null)slot.retiredAt=state.time;
+   else if(state.time-slot.retiredAt>=2400)constellationSlots[i]=null;
+ }
+ const assigned=new Set(constellationSlots.filter(Boolean).map(slot=>slot.account));
+ for(const account of active){
+   if(assigned.has(account))continue;
+   const vacant=constellationSlots.indexOf(null);if(vacant===-1)break;
+   constellationSlots[vacant]={account,retiredAt:null};assigned.add(account);
+ }
+ const accounts=constellationSlots.filter(slot=>slot&&active.has(slot.account)).map(slot=>slot.account),overflow=active.size-accounts.length;
+ const cx=w/2,cy=h/2+5,rx=Math.max(70,w*.34),ry=h*.34;
+ const positions=new Map(accounts.map((a,i)=>{const angle=-Math.PI/2+constellationSlots.findIndex(slot=>slot?.account===a)*Math.PI*2/16;return[a,{x:cx+Math.cos(angle)*rx,y:cy+Math.sin(angle)*ry}]}));
+ // Orbital guides are layout scaffolding, not a spatial or geographic encoding.
+ ctx.strokeStyle=colors.line;ctx.setLineDash([2,8]);ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+ for(const t of recentTransfers){const a=positions.get(t.send.account),b=positions.get(t.send.destination);if(!a||!b)continue;
+  const completed=!!t.receive,color=completed?colors.receive:colors.send;
+  visualItem('link:'+t.send.hash,(a.x+2*cx+b.x)/4,(a.y+2*cy+b.y)/4,color,()=>{
+  const inheritedAlpha=ctx.globalAlpha;ctx.globalAlpha*=completed?.24:.55;ctx.strokeStyle=color;ctx.lineWidth=1+Math.max(0,Math.min(4,(logAmount(t.send.raw)+5)/2));ctx.setLineDash(completed?[]:[3,7]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(cx,cy,b.x,b.y);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=inheritedAlpha;
+  const arrowP=.88,arrowQ=1-arrowP,ax=arrowQ*arrowQ*a.x+2*arrowQ*arrowP*cx+arrowP*arrowP*b.x,ay=arrowQ*arrowQ*a.y+2*arrowQ*arrowP*cy+arrowP*arrowP*b.y;
+  const angle=Math.atan2(2*arrowQ*(cy-a.y)+2*arrowP*(b.y-cy),2*arrowQ*(cx-a.x)+2*arrowP*(b.x-cx));
+  ctx.save();ctx.translate(ax,ay);ctx.rotate(angle);ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(5,0);ctx.lineTo(-4,-3);ctx.lineTo(-4,3);ctx.closePath();ctx.fill();ctx.restore();
+  const age=state.time-(completed?t.receive.at:t.send.at);
+  // A brief pulse marks event receipt, never an inferred transfer velocity.
+  if(!reducedMotion&&age<1000){const p=age/1000,q=1-p;dot(q*q*a.x+2*q*p*cx+p*p*b.x,q*q*a.y+2*q*p*cy+p*p*b.y,4,color,true)}
+  const px=(a.x+2*cx+b.x)/4,py=(a.y+2*cy+b.y)/4;
+  hits.push({x:px,y:py,r:15,block:t.send});
+  });
+ }
+ for(const [account,p]of positions){const bs=m.recent.filter(b=>b.account===account),last=bs.at(-1);
+  visualItem('account:'+account,p.x,p.y,colors.receive,()=>{
+  dot(p.x,p.y,16,colors.bg);ctx.strokeStyle=colors.line;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,17,0,Math.PI*2);ctx.stroke();
+  const dy=p.y<cy?-34:42;text(short(account),p.x,p.y+dy,colors.ink,11,'center');
+  },2400);
+  if(last)mark(last,p.x,p.y,6,'account-head');
+  // Small ticks are this account's confirmed blocks in the visible minute.
+  bs.slice(-16).forEach((b,i)=>{const angle=-Math.PI/2+i*.35;mark(b,p.x+Math.cos(angle)*26,p.y+Math.sin(angle)*26,3)});
+ }
+ text('ACCOUNTS / LAST 60s',cx,cy-10,colors.muted,10,'center');text(String(active.size).padStart(2,'0'),cx,cy+28,colors.ink,35,'center');
+ text('16-account lens · '+Math.max(0,overflow)+' outside view',20,h-17,colors.muted,10);
+ if(!accounts.length)text('Waiting for confirmed account activity',cx,cy+60,colors.muted,10,'center');
+}
+</script>
+<script>startVisualizer();</script></body></html>
