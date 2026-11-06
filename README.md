@@ -31,4 +31,4 @@ bun test
 
 ## GitHub Pages
 
-The workflow in `.github/workflows/pages.yml` builds and deploys `dist/` on pushes to `main`. Pull requests run the build without deploying. After creating `openrai/network-activity-viz`, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**. The expected project-site address is `https://openrai.github.io/network-activity-viz/`.
+The workflow in `.github/workflows/pages.yml` builds and deploys `dist/` on pushes to `main`. Pull requests run the build without deploying. The site is hosted at https://viz.openrai.org/ through GitHub Pages, with Cloudflare managing its DNS.

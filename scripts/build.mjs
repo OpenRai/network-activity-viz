@@ -21,6 +21,7 @@ for (const page of pages) {
   await cp(join(root, page), join(output, page));
 }
 await cp(join(root, 'js'), join(output, 'js'), { recursive: true });
+await cp(join(root, 'CNAME'), join(output, 'CNAME'));
 
 const missing = [];
 for (const path of [...pages, 'js/gallery-nav.js', 'js/nano-feed.js']) {
