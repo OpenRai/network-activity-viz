@@ -1,6 +1,6 @@
 (() => {
   const pages = [
-    { href: 'starmap.html', name: 'Starmap', detail: 'Account constellation' },
+    { href: 'starmap.html', name: 'Starmap', detail: 'Account galaxy' },
     { href: 'constellation.html', name: 'Constellation', detail: 'Account links' },
     { href: 'hangtime.html', name: 'Hangtime', detail: 'Send and receive timing' },
     { href: 'score.html', name: 'Score', detail: 'Account chains' },
