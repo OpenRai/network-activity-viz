@@ -1,0 +1,15 @@
+import {test,expect} from 'bun:test';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const src=readFileSync(new URL('../js/stardust-wake.js',import.meta.url),'utf8');
+const html=readFileSync(new URL('../starmap.html',import.meta.url),'utf8');
+const make=(opts={})=>{const ctx={images:0,rects:0,drawImage(){ctx.images++},fillRect(){ctx.rects++},createRadialGradient:()=>({addColorStop(){}}),createLinearGradient:()=>({addColorStop(){}})};
+  const makeCanvas=()=>({getContext:()=>ctx,width:0,height:0});return {api:vm.runInNewContext(src+';createStardustWake',{Math})({makeCanvas,...opts}),ctx}};
+const A={x:0,y:0},B={x:200,y:0},X=v=>v,Y=v=>v;
+const fly=(api,t0=0,du=1000)=>{api.launch(A,B,t0,du,'H1');for(let t=t0;t<=t0+du+50;t+=16)api.update(t)};
+test('send emits lingering dust that expires',()=>{const {api,ctx}=make();fly(api);const n=api.stats().dust;expect(n).toBeGreaterThan(60);api.update(20000);expect(api.stats().dust).toBe(n);api.draw(ctx,20000,X,Y,1);expect(ctx.rects+ctx.images).toBeGreaterThan(0);api.update(200000);expect(api.stats().wakes).toBe(0)});
+test('matching receive sweeps dust and clears wake',()=>{const {api,ctx}=make();fly(api);expect(api.disperse('NOPE',5000,700)).toBe(false);expect(api.disperse('H1',5000,700)).toBe(true);expect(api.stats().touched).toBe(api.stats().dust);expect(api.disperse('H1',5000,700)).toBe(false);api.update(5400);api.draw(ctx,5400,X,Y,1);expect(ctx.images).toBeGreaterThan(0);api.update(9000);expect(api.stats()).toEqual({wakes:0,live:0,dust:0,touched:0})});
+test('receive mid-flight also touches late particles',()=>{const {api}=make();api.launch(A,B,0,1000,'H2');api.update(300);api.disperse('H2',400,700);for(let t=316;t<=1100;t+=16)api.update(t);expect(api.stats().touched).toBe(api.stats().dust)});
+test('eviction caps active wakes',()=>{const {api}=make({maxWakes:5});for(let i=0;i<20;i++){api.launch(A,B,i,1000,'K'+i);api.update(i+1)}expect(api.stats().live).toBeLessThanOrEqual(5);api.update(5000);expect(api.stats().wakes).toBeLessThanOrEqual(5)});
+test('reduced motion keeps dust and disables motion',()=>{const {api,ctx}=make({reducedMotion:true});fly(api,0,1);api.disperse('H1',100,1);api.update(300);api.draw(ctx,300,X,Y,1);expect(api.stats().dust).toBeGreaterThan(0)});
+test('starmap integrates lifecycle and layer',()=>{for(const p of ['stardust.launch(s,d,t0,du,hash)','stardust.disperse(src,t0,du)','drawWake(pn);drawComets(pn)','stardust.clear()','js/stardust-wake.js','id="w"'])expect(html).toContain(p)});
