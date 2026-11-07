@@ -30,11 +30,18 @@ function createSoundFX({profile = 'ethereal'} = {}) {
   window.addEventListener('keydown', resumeAudio);
   window.addEventListener('pageshow', resumeAudio);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resumeAudio(); });
-  function setSoundSet(name) { if (sets[name]) selected = name; }
-  function stop() {
-    enabled = false;
+  function clearVoices() {
     for (const voice of voices) { try { voice.stop(); } catch {} }
     voices.clear();
+  }
+  function setSoundSet(name) {
+    if (!sets[name] || name === selected) return;
+    clearVoices();
+    selected = name;
+  }
+  function stop() {
+    enabled = false;
+    clearVoices();
   }
   async function enable() {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -146,8 +153,9 @@ function createSoundFX({profile = 'ethereal'} = {}) {
         // gesture in every sound set. Longer flights sweep more slowly and
         // finish darker, in time with the comet's travel.
         const sweep = progress * progress * (3 - 2 * progress);
-        const startCutoff = 7200 - 900 * Math.min(1, noiseLength / 3);
-        const endCutoff = 520 - 180 * Math.min(1, noiseLength / 3);
+        const swooshOctave = selected === 'velvet' ? .5 : 1;
+        const startCutoff = (7200 - 900 * Math.min(1, noiseLength / 3)) * swooshOctave;
+        const endCutoff = (520 - 180 * Math.min(1, noiseLength / 3)) * swooshOctave;
         const cutoff = startCutoff * Math.pow(endCutoff / startCutoff, sweep);
         const coefficient = 1 - Math.exp(-2 * Math.PI * cutoff / rate);
         smoothNoise += coefficient * (noise - smoothNoise);
@@ -155,13 +163,15 @@ function createSoundFX({profile = 'ethereal'} = {}) {
         lowNoise += (1 - Math.exp(-2 * Math.PI * lowCutoff / rate)) * (smoothNoise - lowNoise);
         const bandNoise = smoothNoise - lowNoise;
         const swell = Math.sin(Math.PI * progress) ** 1.35;
-        const sweepHz = pitch * (2.8 * Math.pow(.28, sweep));
+        const sweepHz = pitch * swooshOctave * (2.8 * Math.pow(.28, sweep));
         swooshPhase = (swooshPhase + sweepHz / rate) % 1;
         samples[i] = .25 * wave * envelope + (.72 * bandNoise + .272 * Math.sin(swooshPhase * Math.PI * 2)) * swell * lfo;
       } else samples[i] = wave * envelope;
     }
     const source = context.createBufferSource(), gain = context.createGain();
-    source.buffer = buffer; gain.gain.value = Math.max(0, Math.min(volume, 0.2)) / Math.sqrt(1 + voices.size);
+    // Lift tonal cues across every preset without changing outside-receive swooshes.
+    const level = outside ? 1 : 2.5;
+    source.buffer = buffer; gain.gain.value = level * Math.max(0, Math.min(volume, 0.2)) / Math.sqrt(1 + voices.size);
     source.connect(gain); gain.connect(context.destination); voices.add(source);
     source.onended = () => { voices.delete(source); source.disconnect(); gain.disconnect(); };
     source.start();
