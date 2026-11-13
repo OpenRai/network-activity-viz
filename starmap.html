@@ -54,12 +54,16 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 .reading strong{font-weight:600;color:#6ee2f0}
 .reading .activity{color:#f6c744}
 .reading .recency{color:#d282ff}
+.sound-toggle{justify-content:flex-start!important;gap:12px;cursor:pointer;min-height:48px}.sound-toggle input{width:24px;height:24px;accent-color:#5df0cc}.sound-symbol{font-size:32px;line-height:1}.sound-toggle:has(input:checked){color:#5df0cc}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas><canvas id="w"></canvas><canvas id="t"></canvas><canvas id="o"></canvas>
 <details id="hud">
 <summary><h1>Account galaxy</h1></summary>
+<label class="r sound-toggle" for="snd"><input id="snd" type="checkbox" aria-describedby="audioState"><span class="sound-symbol" aria-hidden="true">♫</span><span>Sound</span></label>
+<label class="r">Sound set <select id="soundSet"><option value="ascent" selected>Starlight ascent · arpeggio</option><option value="aurora">Aurora silk</option><option value="cascade">Moonlit cascade · arpeggio</option><option value="velvet">Velvet nebula</option><option value="orbit">Orbital shimmer</option></select></label>
+<div id="audioState" class="n" role="status"></div>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
 <label class="r">Node <select id="host">
 <option value="wss://ws.nano.to">Nano.to</option>
@@ -67,9 +71,6 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <option value="stress">Stress demo · 30×</option><option value="demo">Simulated data</option></select></label>
 <label class="r">Memory <select id="win"><option value="10">10 minutes</option><option value="30" selected>30 minutes</option><option value="60">60 minutes</option></select></label>
 <button id="stressReplay" type="button" hidden>Replay 10-second stress demo</button>
-<label class="r" for="snd"><span>SoundFX</span><input id="snd" type="checkbox" checked aria-describedby="audioState"></label>
-<label class="r">Sound set <select id="soundSet"><option value="ascent" selected>Starlight ascent · arpeggio</option><option value="aurora">Aurora silk</option><option value="cascade">Moonlit cascade · arpeggio</option><option value="velvet">Velvet nebula</option><option value="orbit">Orbital shimmer</option></select></label>
-<div id="audioState" class="n" role="status"></div>
 <label class="r" for="sparkles"><span>Ridiculous sparkles</span><input id="sparkles" type="checkbox" checked></label>
 <div id="stats"></div>
 <div class="n reading">
@@ -95,7 +96,7 @@ let isDemo=false,nPend=0,rpc='',rpcFail=0,feedClient=null;const store=[],sendBy=
 const RPCS={'ws.nano.to':'https://rpc.nano.to','rainstorm.city':'https://rainstorm.city/api','node.somenano.com':'https://node.somenano.com/proxy','socket.nanos.cc':'https://proxy.nanos.cc/proxy','ws.powernode.cc':'https://proxy.powernode.cc/proxy'};
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 let W=1,H=1,dpr=1,winMs=30*6e4,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
-const soundFX=createSoundFX();
+const soundFX=createSoundFX({onStatus:message=>{$('audioState').textContent=message}});
 const soundSet=$('soundSet');
 try{const saved=localStorage.getItem('ag-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
 soundFX.setSoundSet(soundSet.value);
@@ -347,13 +348,9 @@ $('win').onchange=e=>{winMs=+e.target.value*6e4;prune(timeNow())};
 $('snd').onchange=async()=>{
 const checkbox=$('snd'),state=$('audioState');
 if(!checkbox.checked){soundFX.disable();state.textContent='';return}
-try{await soundFX.enable();state.textContent='SoundFX enabled · pitch follows amount.';soundFX.play({frequency:440,volume:.12})}
-catch{state.textContent='SoundFX is on · click or press a key to enable audio.'}
+try{await soundFX.enable();if(!checkbox.checked)return;state.textContent='SoundFX enabled · pitch follows amount.';soundFX.play({frequency:440,volume:.12})}
+catch{if(checkbox.checked)state.textContent='Audio paused · turn sound off and on to retry.'}
 };
-async function resumeSoundAfterGesture(){if(!$('snd').checked)return;try{await soundFX.enable();$('audioState').textContent='SoundFX enabled · pitch follows amount.'}catch{}}
-addEventListener('pointerdown',resumeSoundAfterGesture,{once:true});
-addEventListener('keydown',resumeSoundAfterGesture,{once:true});
-if($('snd').checked)resumeSoundAfterGesture();
 addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 addEventListener('click',e=>{if(hover&&!cameraControls.isGesture()&&!e.target.closest('#hud')&&navigator.clipboard){navigator.clipboard.writeText(hover.a).catch(()=>{});floats.push({d:hover,t0:animationNow(),txt:'address copied'})}});
 addEventListener('resize',size);

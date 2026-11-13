@@ -55,17 +55,18 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 .marker-key i{display:inline-block;width:7px;height:7px;border:1px solid currentColor;border-radius:50%;margin-right:5px;vertical-align:1px}
 .marker-key .send{color:#ffc078}.marker-key .receive{color:#69e9f1}
 .n{color:var(--dim);font-size:12px;margin:5px 0 0}
+.sound-toggle{justify-content:flex-start!important;gap:12px;cursor:pointer;min-height:48px}.sound-toggle input{width:24px;height:24px;accent-color:#5df0cc}.sound-symbol{font-size:32px;line-height:1}.sound-toggle:has(input:checked){color:#5df0cc}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas><canvas id="o"></canvas>
 <details id="hud">
 <summary><h1>Amount landscape</h1></summary>
-<div id="st"><i id="dot"></i><span id="stt">starting</span></div>
-<div class="controls"><label>Node <select id="feed"></select></label></div>
-<label class="r">SoundFX <input id="snd" type="checkbox" checked aria-describedby="audioState"></label>
+<label class="r sound-toggle" for="snd"><input id="snd" type="checkbox" aria-describedby="audioState"><span class="sound-symbol" aria-hidden="true">♫</span><span>Sound</span></label>
 <label class="r">Sound set <select id="soundSet"><option value="choir" selected>Voices beyond the heliopause</option><option value="orbit">Rings of the uncanny</option></select></label>
 <div id="audioState" class="n" role="status"></div>
+<div id="st"><i id="dot"></i><span id="stt">starting</span></div>
+<div class="controls"><label>Node <select id="feed"></select></label></div>
 <label class="r">Height scale <select id="hm"><option>sqrt</option><option>linear</option><option>log</option></select></label>
 <div id="stats"></div>
 <canvas id="lg" width="256" height="8"></canvas>

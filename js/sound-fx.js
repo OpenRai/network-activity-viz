@@ -1,7 +1,7 @@
 'use strict';
 // Generated oscillator bytes are embedded so this also works through file://.
 // Source: ../wasm/tone.wat. Web Audio handles playback; WASM generates each waveform.
-function createSoundFX({profile = 'ethereal'} = {}) {
+function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
   const wasmBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 125, 1, 125, 3, 2, 1, 0, 7, 10, 1, 6, 115, 97, 109, 112, 108, 101, 0, 0, 10, 52, 1, 50, 1, 1, 125, 67, 0, 0, 128, 63, 67, 0, 0, 128, 64, 32, 0, 67, 0, 0, 0, 63, 147, 139, 148, 147, 33, 1, 67, 0, 0, 192, 63, 32, 1, 148, 67, 0, 0, 0, 63, 32, 1, 32, 1, 32, 1, 148, 148, 148, 147, 11]);
   let context = null, oscillator = null, enabled = false;
   const voices = new Set();
@@ -21,42 +21,110 @@ function createSoundFX({profile = 'ethereal'} = {}) {
     orbit:{mod:46,index:7.2,ratio:.996,am:4.8}
   };
   let selected = 'air';
-  function resumeAudio() {
-    if (enabled && context && context.state !== 'running' && context.state !== 'closed') {
-      context.resume().catch(() => {});
+  let pending = null, queued = null, disposed = false;
+  function clearVoices() {
+    for (const voice of [...voices]) {
+      try { voice.stop(); } catch {}
+      voice.onended?.();
     }
   }
-  window.addEventListener('pointerdown', resumeAudio);
-  window.addEventListener('keydown', resumeAudio);
-  window.addEventListener('pageshow', resumeAudio);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) resumeAudio(); });
-  function clearVoices() {
-    for (const voice of voices) { try { voice.stop(); } catch {} }
-    voices.clear();
+  function release() {
+    queued = null;
+    pending?.cancel();
+    pending = null;
+    clearVoices();
+    const old = context;
+    context = null;
+    if (old) {
+      old.onstatechange = null;
+      if (old.state !== 'closed') old.close().catch(() => {});
+    }
   }
+  function ready() {
+    if (disposed || !enabled) return Promise.resolve();
+    if (pending) return pending.promise;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return Promise.reject(new Error('Web Audio is unavailable in this browser.'));
+    if (!context || context.state === 'closed') {
+      try { context = new AudioContextClass(); }
+      catch (error) { return Promise.reject(error); }
+      context.onstatechange = () => {
+        if (enabled && context?.state !== 'running') {
+          clearVoices();
+          onStatus('Audio paused · click the sound control to retry.');
+        }
+      };
+    }
+    oscillator ||= new WebAssembly.Instance(new WebAssembly.Module(wasmBytes)).exports;
+    const target = context;
+    if (target.state === 'running') return Promise.resolve();
+    clearVoices();
+    // One bounded resume attempt, including when the browser never settles resume().
+    let cancel, timer;
+    const cancelled = new Promise((_, reject) => { cancel = () => reject(new Error('Audio recovery cancelled.')); });
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Audio recovery timed out.')), 4000);
+    });
+    let resumed;
+    try {
+      resumed = target.resume(); // Called synchronously from the user's gesture.
+    } catch (error) { resumed = Promise.reject(error); }
+    const operation = {cancel, promise:null};
+    pending = operation;
+    operation.promise = Promise.race([resumed, cancelled, timeout]).then(() => {
+      if (!enabled || context !== target) return;
+      if (target.state !== 'running') throw new Error('Audio is still suspended.');
+      onStatus('Sound enabled · pitch follows amount.');
+      const cue = queued;
+      queued = null;
+      if (cue && Date.now() - cue.at < 1500) play(cue.options);
+    }).catch(error => {
+      if (context === target) {
+        release();
+        onStatus('Audio paused · turn sound off and on to retry.');
+      }
+      throw error;
+    }).finally(() => {
+      clearTimeout(timer);
+      if (pending === operation) pending = null;
+    });
+    return operation.promise;
+  }
+  function recover() { if (enabled && !disposed) ready().catch(() => {}); }
+  function visibility() { if (!document.hidden) recover(); }
+  function suspendPage() { release(); }
+  const listeners = [
+    [window, 'pointerdown', recover], [window, 'keydown', recover],
+    [window, 'pageshow', recover], [window, 'focus', recover],
+    [window, 'pagehide', suspendPage], [document, 'freeze', suspendPage],
+    [document, 'resume', recover], [document, 'visibilitychange', visibility]
+  ];
+  for (const [target, type, listener] of listeners) target.addEventListener(type, listener);
   function setSoundSet(name) {
     if (!sets[name] || name === selected) return;
     clearVoices();
+    queued = null;
     selected = name;
   }
-  function stop() {
-    enabled = false;
-    clearVoices();
-  }
-  async function enable() {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) throw new Error('Web Audio is unavailable in this browser.');
-    // Construct and resume synchronously within the checkbox's user gesture.
-    if (!context || context.state === 'closed') context = new AudioContextClass();
-    const resumed = context.resume();
-    oscillator ||= new WebAssembly.Instance(new WebAssembly.Module(wasmBytes)).exports;
-    await resumed;
-    if (context.state !== 'running') throw new Error('Audio is suspended. Click SoundFX again to retry.');
+  function stop() { enabled = false; release(); onStatus(''); }
+  function enable() {
+    if (disposed) return Promise.reject(new Error('Audio has been disposed.'));
     enabled = true;
+    return ready();
+  }
+  function dispose() {
+    stop();
+    disposed = true;
+    for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
   }
   function play({frequency = 440, volume = 0.15, duration, outside = false, account = '', lfoDepth = profile === 'alien' ? .24 : .12} = {}) {
-    if (!enabled || voices.size >= 12) return false;
-    if (context?.state !== 'running') { resumeAudio(); return false; }
+    if (!enabled) return false;
+    if (context?.state !== 'running') {
+      queued ||= {at:Date.now(), options:arguments[0]};
+      recover();
+      return false;
+    }
+    if (voices.size >= 12) return false;
     const preset = sets[selected];
     // Amount still chooses the register; a pentatonic lattice keeps unrelated
     // events harmonious. A little per-event drift avoids perfect tuning.
@@ -173,9 +241,23 @@ function createSoundFX({profile = 'ethereal'} = {}) {
     const level = outside ? 1 : 2.5;
     source.buffer = buffer; gain.gain.value = level * Math.max(0, Math.min(volume, 0.2)) / Math.sqrt(1 + voices.size);
     source.connect(gain); gain.connect(context.destination); voices.add(source);
-    source.onended = () => { voices.delete(source); source.disconnect(); gain.disconnect(); };
+    const owner = context, startedAt = owner.currentTime;
+    // A frozen audio clock may never deliver ended, even while state says running.
+    const expiry = setTimeout(() => {
+      try { source.stop(); } catch {}
+      source.onended?.();
+      if (context === owner && Number.isFinite(startedAt) && owner.currentTime === startedAt) {
+        release();
+        onStatus('Audio paused · waiting for the next sound or user interaction.');
+      }
+    }, duration * 1000 + 1000);
+    source.onended = () => {
+      clearTimeout(expiry);
+      voices.delete(source); source.onended = null;
+      source.disconnect(); gain.disconnect(); source.buffer = null;
+    };
     source.start();
     return true;
   }
-  return {enable, disable: stop, play, setSoundSet};
+  return {enable, disable: stop, play, setSoundSet, dispose};
 }
