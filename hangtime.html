@@ -1,61 +1,7 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Eventsky · Nano visualizer 03</title>
-<meta name="description" content="Watch confirmed Nano blocks leave marks across time. Explore independent send and receive observations by arrival time and transfer amount.">
-<link rel="canonical" href="https://viz.openrai.org/hangtime.html">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Eventsky · Nano in motion">
-<meta property="og:description" content="Watch confirmed Nano blocks leave marks across time. Explore independent send and receive observations by arrival time and transfer amount.">
-<meta property="og:url" content="https://viz.openrai.org/hangtime.html">
-<meta property="og:site_name" content="Nano in motion">
-<meta property="og:locale" content="en_US">
-<meta property="og:image" content="https://viz.openrai.org/assets/og/hangtime.png">
-<meta property="og:image:secure_url" content="https://viz.openrai.org/assets/og/hangtime.png">
-<meta property="og:image:type" content="image/png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Eventsky · Nano in motion — detail of the Nano network visualization">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Eventsky · Nano in motion">
-<meta name="twitter:description" content="Watch confirmed Nano blocks leave marks across time. Explore independent send and receive observations by arrival time and transfer amount.">
-<meta name="twitter:image" content="https://viz.openrai.org/assets/og/hangtime.png">
-<meta name="twitter:image:alt" content="Eventsky · Nano in motion — detail of the Nano network visualization">
-<meta name="theme-color" content="#070d16">
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Eventsky \u00b7 Nano in motion", "description": "Watch confirmed Nano blocks leave marks across time. Explore independent send and receive observations by arrival time and transfer amount.", "url": "https://viz.openrai.org/hangtime.html", "image": "https://viz.openrai.org/assets/og/hangtime.png"}</script>
-<style>
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,sans-serif}button,input,select{font:inherit;color:inherit}button,a,input,select{outline-offset:4px}button,select,input{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:8px 12px}button{cursor:pointer}button:hover{border-color:var(--receive)}button.primary{background:var(--receive);color:var(--bg);font-weight:650}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline}.shell{max-width:1600px;margin:auto;padding:0 36px}header{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.logo{font-size:19px;letter-spacing:4px;font-weight:700}nav{display:flex;gap:18px;color:var(--muted);font:11px monospace}nav a[aria-current]{color:var(--ink)}.source{font:11px monospace;letter-spacing:1px;background:var(--line);padding:6px 10px;border-radius:20px}.intro{display:flex;align-items:flex-end;justify-content:space-between;padding:32px 0 24px;gap:30px}.kicker,.section-label{font:11px monospace;text-transform:uppercase;letter-spacing:2px;color:var(--muted)}h1{font-size:clamp(32px,3.5vw,55px);font-weight:500;letter-spacing:-2px;line-height:1.1;margin:12px 0}.intro p{max-width:470px;color:var(--muted);margin:0}.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--line)}.controls label{display:flex;align-items:center;gap:7px;font:11px monospace;color:var(--muted)}.controls input{width:270px;font:11px monospace}.connection{font:11px monospace;color:var(--muted);min-height:30px;padding:4px 0 12px;overflow-wrap:anywhere}.layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:20px}.visual,.side,.activity{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}.visual-head{display:flex;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);font:11px monospace;gap:12px}.visual-head span:last-child{color:var(--muted)}.canvas-wrap{position:relative}canvas{display:block;width:100%;height:480px;touch-action:pan-y}.legend{padding:14px 20px;display:flex;flex-wrap:wrap;gap:18px;border-top:1px solid var(--line);font:11px monospace;color:var(--muted)}.legend b{font-weight:400}.send{color:var(--send)}.receive{color:var(--receive)}.vote{color:var(--vote)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px 0 25px}.stat{border-left:1px solid var(--line);padding-left:20px}.stat strong{font:30px monospace;display:block}.stat span{font:10px monospace;letter-spacing:1px;color:var(--muted)}.side{padding:20px;align-self:start}.side h2{font-size:14px;font-weight:550;margin:0 0 12px}.side p{color:var(--muted);font-size:12px}.rep{display:flex;justify-content:space-between;font:11px monospace;border-bottom:1px solid var(--line);padding:10px 0;gap:8px}.bar{height:3px;background:var(--vote);margin-top:4px;border-radius:2px}.orv-state{color:var(--vote);font:10px monospace;letter-spacing:1px}.inspect{border-top:1px solid var(--line);margin-top:22px;padding-top:20px}#detail{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.8 monospace;color:var(--muted)}#recent{display:grid;gap:6px;max-height:200px;overflow:auto}.recent-button{padding:7px 9px;text-align:left;font:11px monospace;border-color:var(--line);background:transparent}.activity{margin-top:18px;padding:16px 20px}.activity-head{display:flex;justify-content:space-between;font:11px monospace;color:var(--muted)}.pulse-strip{display:flex;height:28px;gap:4px;align-items:end;margin-top:10px}.pulse-strip i{background:var(--vote);flex:1;min-height:2px;opacity:.7}footer{font:10px/1.8 monospace;color:var(--muted);border-top:1px solid var(--line);padding:18px 0 28px;margin-top:24px}#viewMode{max-width:180px}.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--send);margin-right:6px}@media(max-width:1000px){.layout{grid-template-columns:minmax(0,1fr) 245px}.shell{padding:0 20px}.intro{align-items:start;flex-direction:column;gap:10px}.intro p{max-width:650px}nav{gap:10px}.source{display:none}}@media(max-width:760px){header{height:auto;padding:18px 0;gap:15px;flex-wrap:wrap}nav{flex-wrap:wrap;font-size:10px}.layout{grid-template-columns:1fr}canvas{height:450px}.side{display:grid;grid-template-columns:1fr 1fr;gap:20px}.inspect{border:0;margin:0;padding:0}.stats{gap:5px}.stat{padding-left:10px}.stat strong{font-size:24px}.controls input{width:100%;max-width:100%}.controls label.url{width:100%}.shell{padding:0 14px}.visual-head{padding:14px 12px}.legend{gap:12px;padding:14px 12px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
-
-:root{color-scheme:dark;--bg:#100d21;--panel:#18142d;--ink:#f2edff;--muted:#aba1c6;--line:#302746;--send:#f6bd75;--receive:#70e3ce;--vote:#c49aff}.visual{background:radial-gradient(ellipse at 70% 25%,#292043,#17132a 70%)}.logo{font-weight:400;font-size:15px}.intro h1{font-family:Georgia,serif;font-style:italic;font-size:58px}.source{background:#302143}.visual,.side,.activity{border-radius:18px}.stat strong{color:var(--send)}</style></head>
-<body><div class="shell"><header><h1 style="font:inherit;margin:0;letter-spacing:inherit"><a href="index.html" class="logo">E V E N T S K Y</a></h1><nav aria-label="Visualizer candidates"><a href="constellation.html" >01 Constellation</a><a href="dispatch.html" >02 Dispatch</a><a href="hangtime.html" aria-current="page">03 Hangtime</a><a href="score.html" >04 Score</a></nav><span class="source" id="mode">DEMO / FICTIONAL DATA</span></header>
-<main>
-<div class="controls"><label>Node <select id="feed"><option value="wss://ws.nano.to">Nano.to</option></select></label></div>
-<div class="connection" id="connection" role="status"></div>
-<div class="layout"><div><section class="visual"><div class="visual-head"><span>Send and receive timing</span><span>OBSERVER TIME × AMOUNT</span></div><div class="canvas-wrap"><canvas id="scene" role="img" aria-label="CONFIRMED EVENT SKY. Every mark is a confirmed block. Sends and receives appear independently, positioned by observer receipt time and amount. Select recent blocks with buttons below to inspect details."></canvas></div><div class="legend"><b class="send">■ Final send</b><b class="receive">● Independent receive</b><span>Amount axis logarithmic</span></div></section>
-<div class="stats"><div class="stat"><strong id="sends">0</strong><span>OBSERVED SENDS</span></div><div class="stat"><strong id="receives">0</strong><span>OBSERVED RECEIVES</span></div><div class="stat"><strong id="pending">0</strong><span>OBSERVED BLOCKS</span></div></div>
-<section class="activity"><div class="activity-head"><span>Votes this node has seen</span><span id="voteCount"></span></div><div class="pulse-strip" id="pulse" aria-label="Vote message counts in one-second bins over the last thirty seconds"></div></section></div>
-<aside class="side"><div><div class="orv-state" id="voteState"></div><h2 style="margin-top:12px">Vote activity</h2><p id="orvSummary"></p><p>Pulses mark visible blocks named in votes received by this node. The stream may be partial; these counts do not show voting weight or quorum.</p><h2 style="margin-top:24px">Recent blocks</h2><div id="recent"></div></div><div class="inspect"><h2>Inspect the activity</h2><div id="detail"></div></div></aside></div></main>
-<script>
-const VIEW = 'hangtime';
-const viewOptions = {};
-</script>
-<script src="js/gallery-nav.js"></script>
-<script src="js/format.js"></script>
-<script src="js/event-utils.js"></script>
-<script src="js/event-cache.js"></script>
-<script src="js/nano-feed.js"></script>
-<script src="js/page-settings.js"></script>
-<script src="js/visualizer-core.js"></script>
-<script src="js/canvas-view.js"></script>
-<script>
-function draw(m,w,h){
- const left=65,right=w-25,top=35,bottom=h-55,blocks=m.recent.filter(b=>['send','receive','open'].includes(b.subtype));
- const logs=blocks.map(b=>logAmount(b.raw)),lo=Math.min(-5,...logs),hi=Math.max(3,...logs);
- for(let v=Math.ceil(lo);v<=hi;v++){if(hi-lo>12&&v%2)continue;const y=bottom-(v-lo)/(hi-lo)*(bottom-top);line(left,y,right,y,colors.line);text('10^'+v,left-10,y+4,colors.muted,9,'right')}
- for(let age=0;age<=60;age+=15){const x=right-age/60*(right-left);line(x,top,x,bottom,colors.line);text(age?'-'+age+'s':'NOW',x,bottom+20,colors.muted,10,'center')}
- for(const b of blocks){const x=right-(state.time-b.at)/60000*(right-left),y=bottom-(logAmount(b.raw)-lo)/(hi-lo)*(bottom-top);mark(b,x,y,5)}
- text('XNO / LOG SCALE',left,18,colors.muted,10);text('OBSERVER RECEIPT TIME',w/2,h-12,colors.muted,10,'center');
- if(!blocks.length)empty(w,h,'Waiting for confirmed sends and receives');
-}
-</script>
-<script>startVisualizer();</script></body></html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Eventsky · Nano in motion</title>
+<meta http-equiv="refresh" content="0;url=eventsky.html">
+<link rel="canonical" href="https://viz.openrai.org/eventsky.html">
+<script>location.replace('eventsky.html');</script></head>
+<body><h1>Eventsky</h1><p><a href="eventsky.html">Open Eventsky</a></p></body></html>

@@ -1,7 +1,7 @@
-/* Shared data, simulation, controls, and panels for the four canvas candidates. */
+/* Shared event replay, controls, and live data for Nano Atlas and Eventsky. */
 'use strict';
 let feedClient = null;
-const state = { mode:'live', time:0, windowMs:globalThis.gallerySettings?.memoryMs||30*60000, playing:true, blocks:[], votes:[], recording:[], seen:new Set(), selected:null, accountOrder:new Map(), status:'', started:0, demoIndex:0 };
+const state = { mode:'live', time:0, windowMs:globalThis.gallerySettings?.memoryMs||30*60000, playing:true, blocks:[], votes:[], recording:[], seen:new Set(), selected:null, selectedAccount:null, accountOrder:new Map(), status:'', started:0, demoIndex:0 };
 const demo = [];
 const names = ['Atlas','Birch','Cedar','Delta','Ember','Fern','Grove','Harbor','Iris','Juniper','Kite','Lumen'];
 for (let i=0; i<1200; i++) {
@@ -58,9 +58,9 @@ function rememberBlock(block){
   if(state.accountOrder.size>6000){const retained=new Set(state.blocks.flatMap(b=>[b.account,b.destination]).filter(Boolean));state.accountOrder=new Map([...state.accountOrder].filter(([a])=>retained.has(a)));}
 }
 function advanceDemo(){if(!['demo','stress'].includes(state.mode))return;while(state.demoIndex<demo.length&&demo[state.demoIndex].at<=state.time){const event=demo[state.demoIndex++];ingest(event,event.at)}}
-function clearRecording(){viewOptions.reset?.();visualItems.clear();state.blocks=[];state.votes=[];state.recording=[];state.seen.clear();state.accountOrder.clear();state.selected=null;state.demoIndex=0;state.time=0;}
+function clearRecording(){viewOptions.reset?.();visualItems.clear();state.blocks=[];state.votes=[];state.recording=[];state.seen.clear();state.accountOrder.clear();state.selected=null;state.selectedAccount=null;state.demoIndex=0;state.time=0;}
 function disconnect(){feedClient?.stop();feedClient=null}
-function startDemo(stress=false){disconnect();clearRecording();state.mode=stress?'stress':'demo';state.time=stress?0:VIEW==='score'?60000:14000;state.playing=true;state.status=stress?'Stress test · fictional activity':'Simulated data';advanceDemo();render();}
+function startDemo(stress=false){disconnect();clearRecording();state.mode=stress?'stress':'demo';state.time=stress?0:VIEW==='eventsky'?25*60*1000:14000;state.playing=true;state.status=stress?'Stress test · fictional activity':'Simulated data';advanceDemo();render();}
 function connectSelected(){
   const selected=$('feed').value;
   if(selected==='demo'||selected==='stress'){startDemo(selected==='stress');return}
@@ -89,7 +89,8 @@ function model(){
  for(const vote of votes)if(vote.at>state.time-900)for(const hash of vote.hashes)votePulses.set(hash,Math.max(votePulses.get(hash)||0,vote.at));
  return {blocks,byHash,receives,transfers,votes,recent,votePulses};
 }
-function inspect(block){state.selected=block.hash;render()}
+function inspect(block){state.selected=block.hash;state.selectedAccount=null;render()}
+function inspectAccount(account){state.selected=null;state.selectedAccount=account;render()}
 function updatePanels(m){
  $('mode').textContent=state.mode==='live'?'LIVE / OBSERVER DATA':state.mode==='stress'?'STRESS TEST / FICTIONAL DATA':'SIMULATED DATA';
  $('connection').textContent=state.status;
@@ -101,10 +102,16 @@ function updatePanels(m){
 }
 function updateConsensusPanel(m){
  const recentVotes=m.votes.filter(v=>v.at>state.time-10000);
- $('voteState').textContent=state.mode!=='live'?'SIMULATED VOTES · '+(state.mode==='stress'?'STRESS TEST':'DEMO'):m.votes.length?'VOTE MESSAGES OBSERVED':'VOTE STREAM UNOBSERVED';
- $('orvSummary').textContent=state.mode==='live'&&!m.votes.length?'No vote messages received from this node yet.':recentVotes.length+(state.mode==='live'?' vote messages received by this node':' simulated vote messages')+' in the last 10s.';
+ if($('voteState'))$('voteState').textContent=state.mode!=='live'?'SIMULATED VOTES · '+(state.mode==='stress'?'STRESS TEST':'DEMO'):m.votes.length?'VOTE MESSAGES OBSERVED':'VOTE STREAM UNOBSERVED';
+ if($('orvSummary'))$('orvSummary').textContent=state.mode==='live'&&!m.votes.length?'No vote messages received yet.':recentVotes.length+(state.mode==='live'?' vote messages received by this node':' simulated vote messages')+' in the last 10s.';
 }
 function updateBlockDetails(m){
+ if(state.selectedAccount){
+  const account=state.selectedAccount,accountBlocks=m.blocks.filter(b=>b.account===account),outgoing=m.transfers.filter(t=>t.send.account===account),incoming=m.transfers.filter(t=>t.send.destination===account),latest=accountBlocks.at(-1);
+  const lines=['ACCOUNT · OBSERVED','Account: '+account,'Blocks in selected time window: '+accountBlocks.length,'Outgoing sends: '+outgoing.length,'Incoming linked sends: '+incoming.length];
+  if(latest)lines.push('Latest block: '+latest.subtype.toUpperCase()+' · '+amount(latest.raw));
+  const output=$('detail');if(output){output.hidden=false;output.textContent=lines.join('\n')}return;
+ }
  const selected=m.byHash.get(state.selected);
  let detail='Select a mark or a recent block to inspect the confirmed block.';
  if(selected){
@@ -118,9 +125,10 @@ function updateBlockDetails(m){
   lines.push('Representatives this node observed voting for this block: '+endorsers.size);
   detail=lines.join('\n');
  }
- $('detail').textContent=detail;
+ const output=$('detail');if(output){output.hidden=!selected;output.textContent=detail;}
 }
 function updateRecentBlocks(m){
+ if(!$('recent'))return;
  const recentKey=m.blocks.slice(-4).map(b=>b.hash).join('|');
  if($('recent').dataset.key!==recentKey){
  $('recent').dataset.key=recentKey;$('recent').replaceChildren();for(const b of m.blocks.slice(-4).reverse()){
@@ -129,6 +137,6 @@ function updateRecentBlocks(m){
  }
 }
 function updateVotePulse(m){
- const strip=$('pulse');strip.replaceChildren();for(let i=29;i>=0;i--){const end=state.time-i*1000,count=m.votes.filter(v=>v.at>end-1000&&v.at<=end).length;const bar=document.createElement('i');bar.style.height=Math.min(28,2+count*1.8)+'px';bar.title=count+' vote messages';strip.append(bar)}
- $('voteCount').textContent=m.votes.filter(v=>v.at>state.time-30000).length+(state.mode==='live'?' messages':' simulated messages')+' / 30s';
+ const strip=$('pulse');if(strip){strip.replaceChildren();for(let i=29;i>=0;i--){const end=state.time-i*1000,count=m.votes.filter(v=>v.at>end-1000&&v.at<=end).length;const bar=document.createElement('i');bar.style.height=Math.min(28,2+count*1.8)+'px';bar.title=count+' vote messages';strip.append(bar)}}
+ const count=m.votes.filter(v=>v.at>state.time-30000).length;if($('voteCount'))$('voteCount').textContent=count+(state.mode==='live'?' votes / 30s':' simulated votes / 30s');
 }

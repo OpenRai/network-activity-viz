@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nano Atlas · Nano in motion</title>
+  <meta name="description" content="Explore a live Nano account network. Follow each account’s block chain and the confirmed transfer paths connecting it to others.">
+  <link rel="canonical" href="https://viz.openrai.org/nano-atlas.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Nano Atlas · Nano in motion">
+  <meta property="og:description" content="An immersive live account network with visible block chains and confirmed transfer paths.">
+  <meta property="og:url" content="https://viz.openrai.org/nano-atlas.html">
+  <meta property="og:site_name" content="Nano in motion">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://viz.openrai.org/assets/og/constellation.png">
+  <meta property="og:image:secure_url" content="https://viz.openrai.org/assets/og/constellation.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Nano Atlas — connected Nano accounts, block chains and transfer paths">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Nano Atlas · Nano in motion">
+  <meta name="twitter:description" content="An immersive live account network with visible block chains and confirmed transfer paths.">
+  <meta name="twitter:image" content="https://viz.openrai.org/assets/og/constellation.png">
+  <meta name="twitter:image:alt" content="Nano Atlas — connected Nano accounts, block chains and transfer paths">
+  <meta name="theme-color" content="#050915">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Nano Atlas · Nano in motion","description":"Explore a live Nano account network. Follow each account’s block chain and the confirmed transfer paths connecting it to others.","url":"https://viz.openrai.org/nano-atlas.html","image":"https://viz.openrai.org/assets/og/constellation.png"}</script>
+  <link rel="stylesheet" href="styles/immersive.css">
+</head>
+<body data-theme="atlas">
+  <canvas id="scene" role="img" aria-label="Nano Atlas live account network with account block chains and confirmed transfer paths"></canvas>
+  <header class="stage-head">
+    <a class="brand" href="index.html">
+      <span class="brand-kicker">Live account network</span>
+      <h1>Nano Atlas</h1>
+      <p>Each account keeps its chain. Confirmed transfers draw the paths between them.</p>
+    </a>
+    <div class="stage-tools">
+      <div class="controls" id="controls"><label>Node <select id="feed"></select></label></div>
+      <div class="stage-state"><span class="stage-mode" id="mode">CONNECTING</span><span id="connection" class="connection" role="status"></span></div>
+    </div>
+  </header>
+  <div class="signals" aria-label="Observed activity">
+    <div class="signal"><strong id="sends">0</strong><span class="signal-label">Send blocks</span></div>
+    <div class="signal"><strong id="receives">0</strong><span class="signal-label">Receives</span></div>
+    <div class="signal"><strong id="pending">0</strong><span class="signal-label">Blocks in view</span></div>
+    <div class="signal vote-signal"><strong id="voteState">Vote stream</strong><span id="orvSummary">Waiting for observed vote messages.</span></div>
+  </div>
+  <div class="legend" aria-label="Map legend">
+    <span><i class="send-mark"></i>Send block · square</span>
+    <span><i></i>Receive / open block · dot</span>
+    <span><i class="account-mark"></i>Account · circle</span>
+    <span><i class="send-path-mark"></i>Transfer path</span>
+    <span><i class="chain-mark"></i>Account chain</span>
+    <span><i class="vote-mark"></i>Vote pulse</span>
+    <span><i class="depth-mark"></i>Transfer amount → depth</span>
+  </div>
+  <output id="detail" hidden></output>
+  <script>
+    const VIEW = 'atlas';
+    const atlasLayout = new Map();
+    const viewOptions = {reset: () => atlasLayout.clear()};
+    function atlasHash(value){let h=2166136261;for(const c of value)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h}
+    function draw(m,w,h){
+      const accountsByActivity=new Map();
+      for(const b of m.blocks){
+        accountsByActivity.set(b.account,Math.max(accountsByActivity.get(b.account)||-Infinity,b.at));
+        if(b.subtype==='send'&&b.destination)accountsByActivity.set(b.destination,Math.max(accountsByActivity.get(b.destination)||-Infinity,b.at));
+      }
+      const accountLimit=w<600?28:52;
+      const accounts=[...accountsByActivity].sort((a,b)=>b[1]-a[1]).slice(0,accountLimit).map(([account])=>account);
+      const accountSet=new Set(accounts),marginX=Math.max(84,w*.055),left=marginX,right=w-marginX,top=Math.max(150,h*.19),bottom=Math.max(top+180,h-250),cx=(left+right)/2,cy=(top+bottom)/2,plotWidth=right-left,plotHeight=bottom-top,points=new Map();
+      for(const account of accounts){
+        let p=atlasLayout.get(account);
+        if(!p){const seed=atlasHash(account),angle=(seed%100000)/100000*Math.PI*2,radius=.16+((seed>>>11)%1000)/1000*.27;p={x:.5+Math.cos(angle)*radius,y:.5+Math.sin(angle)*radius,vx:0,vy:0,seed};atlasLayout.set(account,p)}
+        points.set(account,p);
+      }
+      const allTransfers=m.transfers.filter(t=>t.send.destination&&accountSet.has(t.send.account)&&accountSet.has(t.send.destination));
+      const magnitudes=allTransfers.map(t=>logAmount(t.send.raw)),minMagnitude=Math.min(...magnitudes),maxMagnitude=Math.max(...magnitudes),depthByAccount=new Map();
+      for(const transfer of allTransfers){
+        const depth=maxMagnitude>minMagnitude?((logAmount(transfer.send.raw)-minMagnitude)/(maxMagnitude-minMagnitude)-.5)*.64:0;
+        for(const account of [transfer.send.account,transfer.send.destination]){const value=depthByAccount.get(account)||{sum:0,count:0};value.sum+=depth;value.count++;depthByAccount.set(account,value)}
+      }
+      const accountDepth=account=>{const value=depthByAccount.get(account);return value?value.sum/value.count:0};
+      const theta=reducedMotion?0:state.time*.000025+Math.sin(state.time*.00018)*.08,cos=Math.cos(theta),sin=Math.sin(theta);
+      function project(x,y,z=0){const dx=x-.5,rx=dx*cos-z*sin,rz=dx*sin+z*cos,perspective=1/(1-rz*.12);return{x:cx+rx*plotWidth*.97*perspective,y:cy+(y-.5)*plotHeight*.95*perspective-rz*plotHeight*.12,depth:rz}}
+      const projected=new Map(accounts.map(account=>{const p=points.get(account);return[account,project(p.x,p.y,accountDepth(account))]}));
+      const transfers=allTransfers.slice(-150);
+      for(let i=0;i<accounts.length;i++)for(let j=i+1;j<accounts.length;j++){
+        const a=points.get(accounts[i]),b=points.get(accounts[j]),dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy+.004,f=Math.min(.009,.000055/d2);
+        a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f;
+      }
+      for(const t of transfers){const a=points.get(t.send.account),b=points.get(t.send.destination),dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,f=Math.min(.0025,d*.0012);a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f}
+      for(const [account,p]of points){
+        const seedRadius=.16+((p.seed>>>11)%1000)/1000*.27,angle=(p.seed%100000)/100000*Math.PI*2,homeX=.5+Math.cos(angle)*seedRadius,homeY=.5+Math.sin(angle)*seedRadius;
+        p.vx+=(homeX-p.x)*.0012;p.vy+=(homeY-p.y)*.0012;p.vx*=.84;p.vy*=.84;p.x=Math.max(.08,Math.min(.92,p.x+p.vx));p.y=Math.max(.08,Math.min(.92,p.y+p.vy));
+      }
+      for(const account of [...atlasLayout.keys()])if(!accountSet.has(account))atlasLayout.delete(account);
+      ctx.save();ctx.strokeStyle='rgba(115,164,198,.1)';ctx.setLineDash([2,10]);
+      for(const r of [.2,.34,.47]){ctx.beginPath();ctx.ellipse(cx,cy,plotWidth*r,plotHeight*r*.75,0,0,Math.PI*2);ctx.stroke()}
+      ctx.setLineDash([]);ctx.restore();
+      const corners=[];for(const z of [-.32,.32])for(const y of [.08,.92])for(const x of [.08,.92])corners.push({x,y,z,point:project(x,y,z)});
+      ctx.save();ctx.lineWidth=1;
+      for(let i=0;i<corners.length;i++)for(let j=i+1;j<corners.length;j++){
+        const a=corners[i],b=corners[j],different=[a.x!==b.x,a.y!==b.y,a.z!==b.z].filter(Boolean).length;if(different!==1)continue;
+        const front=a.z===.32&&b.z===.32,back=a.z===-.32&&b.z===-.32;ctx.strokeStyle=front?'rgba(132,205,222,.24)':'rgba(132,205,222,.11)';ctx.setLineDash(back?[3,7]:[]);ctx.beginPath();ctx.moveTo(a.point.x,a.point.y);ctx.lineTo(b.point.x,b.point.y);ctx.stroke();
+      }
+      ctx.restore();
+      for(const t of transfers){
+        const a=projected.get(t.send.account),b=projected.get(t.send.destination),ax=a.x,ay=a.y,bx=b.x,by=b.y,received=!!t.receive,color=received?colors.receive:colors.send;
+        ctx.save();ctx.strokeStyle=color;ctx.globalAlpha=received?.34:.2;ctx.lineWidth=.8+Math.min(3,Math.max(0,(logAmount(t.send.raw)+4)/8));ctx.setLineDash(received?[]:[3,7]);ctx.beginPath();ctx.moveTo(ax,ay);ctx.quadraticCurveTo(cx,cy,bx,by);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+        const px=(ax+2*cx+bx)/4,py=(ay+2*cy+by)/4;hits.push({x:px,y:py,r:14,block:t.send});
+        if(received&&!reducedMotion){const age=state.time-t.receive.at;if(age>=0&&age<1100){const p=age/1100,q=1-p;dot(q*q*ax+2*q*p*cx+p*p*bx,q*q*ay+2*q*p*cy+p*p*by,3.2,color,true)}}
+      }
+      const blocksByAccount=new Map();
+      for(const b of m.blocks)if(accountSet.has(b.account)){const list=blocksByAccount.get(b.account)||[];list.push(b);blocksByAccount.set(b.account,list)}
+      for(const account of [...accounts].sort((a,b)=>projected.get(a).depth-projected.get(b).depth)){
+        const p=points.get(account),position=projected.get(account),x=position.x,y=position.y,dx=x-cx,dy=y-cy,len=Math.hypot(dx,dy)||1,rx=dx/len,ry=dy/len,tx=-ry,ty=rx,depth=accountDepth(account),nodeScale=1+depth*.35;
+        const chain=(blocksByAccount.get(account)||[]).sort((a,b)=>a.at-b.at).slice(-8);
+        for(let i=0;i<chain.length;i++){
+          const offset=20+(chain.length-1-i)*8,side=(i-(chain.length-1)/2)*2.5,bx=x+rx*offset+tx*side,by=y+ry*offset+ty*side;
+          if(i){const priorOffset=20+(chain.length-i)*8,priorSide=(i-1-(chain.length-1)/2)*2.5;line(x+rx*priorOffset+tx*priorSide,y+ry*priorOffset+ty*priorSide,bx,by,'rgba(139,178,202,.48)',1)}
+          const amountSize=Math.max(2.2,Math.min(5.2,2.2+(logAmount(chain[i].raw)+8)/9))*nodeScale;mark(chain[i],bx,by,amountSize,'atlas-chain',false);
+        }
+        const latest=chain.at(-1);dot(x,y,6*nodeScale,colors.bg);dot(x,y,3.2*nodeScale,latest&&latest.subtype==='send'?colors.send:colors.receive,true);
+        const label=short(account),labelX=x+rx*13,labelY=y+ry*13,align=rx<-.25?'right':'left',labelWidth=label.length*6;
+        text(label,labelX,labelY,colors.ink,10,align);
+        hits.push({left:align==='right'?labelX-labelWidth:labelX,right:align==='right'?labelX:labelX+labelWidth,top:labelY-10,bottom:labelY+4,account});
+      }
+      if(!accounts.length)empty(w,h,'Waiting for confirmed account activity');
+    }
+  </script>
+  <script src="js/gallery-nav.js"></script>
+  <script src="js/format.js"></script>
+  <script src="js/event-utils.js"></script>
+  <script src="js/event-cache.js"></script>
+  <script src="js/nano-feed.js"></script>
+  <script src="js/page-settings.js"></script>
+  <script src="js/visualizer-core.js"></script>
+  <script src="js/canvas-view.js"></script>
+  <script>startVisualizer();</script>
+</body>
+</html>

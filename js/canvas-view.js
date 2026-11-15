@@ -56,11 +56,12 @@ function setup(){const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePi
 function text(label,x,y,color=colors.muted,size=11,align='left'){ctx.fillStyle=color;ctx.font=size+'px ui-monospace,monospace';ctx.textAlign=align;ctx.fillText(label,x,y);ctx.textAlign='left'}
 function line(x1,y1,x2,y2,color,width=1,dash=[]){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([])}
 function dot(x,y,r,color,glow=false){ctx.save();ctx.fillStyle=color;if(glow){ctx.shadowColor=color;ctx.shadowBlur=16}ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore()}
-function mark(block, x, y, radius = 5, role = 'block') {
+function mark(block, x, y, radius = 5, role = 'block', interactive = true, opacity = 1) {
   let color = colors.vote;
   if (block.subtype === 'send') color = colors.send;
   else if (['receive', 'open'].includes(block.subtype)) color = colors.receive;
   function paint() {
+    ctx.save();ctx.globalAlpha*=opacity;
     ctx.fillStyle = color;
     if (block.subtype === 'send') ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
     else dot(x, y, radius, color);
@@ -78,15 +79,17 @@ function mark(block, x, y, radius = 5, role = 'block') {
       ctx.lineWidth = 1.5;
       ctx.beginPath();ctx.arc(x, y, radius+5, 0, Math.PI*2);ctx.stroke();
     }
-    hits.push({x, y, r:Math.max(12, radius), block});
+    if(interactive)hits.push({x, y, r:Math.max(12, radius), block});
+    ctx.restore();
   }
   // Dispatch fades entire rows, so its block marks must not also fade independently.
   if (viewOptions.fadeMarks === false) paint();
   else visualItem(role+':'+block.hash, x, y, color, paint);
 }
 function empty(w,h,message){text(message,w/2,h/2,colors.muted,12,'center')}
-canvas.onclick=e=>{const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hits.slice().reverse().find(p=>Math.hypot(x-p.x,y-p.y)<p.r);if(hit)inspect(hit.block)};
-canvas.onmousemove=e=>{const rect=canvas.getBoundingClientRect();canvas.style.cursor=hits.some(p=>Math.hypot(e.clientX-rect.left-p.x,e.clientY-rect.top-p.y)<p.r)?'pointer':'default'};
+function containsHit(hit,x,y){return hit.left!==undefined?x>=hit.left&&x<=hit.right&&y>=hit.top&&y<=hit.bottom:Math.hypot(x-hit.x,y-hit.y)<hit.r}
+canvas.onclick=e=>{const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hits.slice().reverse().find(p=>containsHit(p,x,y));if(hit){if(hit.account)inspectAccount(hit.account);else inspect(hit.block)}};
+canvas.onmousemove=e=>{if(document.body.dataset.theme==='eventsky'){canvas.style.cursor='default';return}const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;canvas.style.cursor=hits.some(p=>containsHit(p,x,y))?'pointer':'default'};
 function render(){
  const m=model();activeVotePulses=m.votePulses;updatePanels(m);const {w,h}=setup();
  if(w!==visualWidth||h!==visualHeight){visualItems.clear();visualWidth=w;visualHeight=h;}

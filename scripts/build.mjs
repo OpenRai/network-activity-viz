@@ -7,6 +7,8 @@ const output = join(root, 'dist');
 const pages = [
   'index.html',
   'starmap.html',
+  'nano-atlas.html',
+  'eventsky.html',
   'constellation.html',
   'hangtime.html',
   'score.html',
@@ -21,11 +23,12 @@ for (const page of pages) {
   await cp(join(root, page), join(output, page));
 }
 await cp(join(root, 'js'), join(output, 'js'), { recursive: true });
+await cp(join(root, 'styles'), join(output, 'styles'), { recursive: true });
 await cp(join(root, 'assets'), join(output, 'assets'), { recursive: true });
 await cp(join(root, 'CNAME'), join(output, 'CNAME'));
 
 const missing = [];
-for (const path of [...pages, 'js/gallery-nav.js', 'js/nano-feed.js']) {
+for (const path of [...pages, 'js/gallery-nav.js', 'js/nano-feed.js', 'styles/immersive.css']) {
   try {
     await stat(join(output, path));
   } catch {
