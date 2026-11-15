@@ -83,6 +83,7 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <script src="js/gallery-nav.js"></script>
 <script src="js/map-controls.js"></script>
 <script src="js/event-utils.js"></script>
+<script src="js/event-cache.js"></script>
 <script src="js/nano-feed.js"></script>
 <script src="js/sound-fx.js"></script>
 <script src="js/logo-gravity.js"></script>
@@ -92,7 +93,7 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 (()=>{
 const $=id=>document.getElementById(id);
 const cv=$('c'),cx=cv.getContext('2d'),wc=$('w'),wx=wc.getContext('2d'),tc=$('t'),tx=tc.getContext('2d'),ov=$('o'),ox=ov.getContext('2d');
-let isDemo=false,nPend=0,rpc='',rpcFail=0,feedClient=null;const store=[],sendBy=new Map(),want=new Map();
+let isDemo=false,nPend=0,rpc='',rpcFail=0,feedClient=null;const sendBy=new Map(),want=new Map();
 const RPCS={'ws.nano.to':'https://rpc.nano.to','rainstorm.city':'https://rainstorm.city/api','node.somenano.com':'https://node.somenano.com/proxy','socket.nanos.cc':'https://proxy.nanos.cc/proxy','ws.powernode.cc':'https://proxy.powernode.cc/proxy'};
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 let W=1,H=1,dpr=1,winMs=30*6e4,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
@@ -143,31 +144,32 @@ function ingest(sa,da,x,t,anim,hash,raw){
 if(!sa||!da||sa===da||!(x>0))return;
 const s=node(sa),d=node(da,s),e=getEdge(s,d);
 e.ts.push(t);e.am.push(x);s.n++;d.n++;s.last=d.last=t;nSends++;last={sa,da,x,raw};
-if(anim){if(!isDemo){store.push([sa,da,x,t,raw]);if(store.length>1200)store.splice(0,store.length-600)}
 if(hash){e.pend++;sendBy.set(hash,{e,t,x,raw,r:false});if(sendBy.size>5000)sendBy.delete(sendBy.keys().next().value)}
+if(anim){
 const la=Math.log10(x),t0=animationNow(),du=RM?1:850+random()*300;comets.push({s,d,t0,du,la,x,raw,kind:'send'});if(sparkles.checked)stardust.launch(s,d,t0,du,hash);s.pulse=1;blip(la,.1,1,sa)}}
-function land(a,src,x,t,isOpen,raw){
+function land(a,src,x,t,isOpen,raw,animate=true){
 x=x>0?x:0;const kind=isOpen?'open':'receive',la=x>0?Math.log10(x):-2,h=src&&sendBy.get(src),tag=isOpen?', new account':'';
-if(h&&!h.r&&h.e.d.a===a&&edges.get(h.e.s.a+'>'+a)===h.e){h.r=true;if(h.e.pend>0)h.e.pend--;h.e.d.last=t;h.e.d.pulse=1;
+if(h&&!h.r&&h.e.d.a===a&&edges.get(h.e.s.a+'>'+a)===h.e){h.r=true;if(h.e.pend>0)h.e.pend--;h.e.d.last=t;if(!animate)return;h.e.d.pulse=1;
 const t0=animationNow(),du=RM?1:700;stardust.disperse(src,t0,du);
 comets.push({s:h.e.s,d:h.e.d,t0,du,la,x:h.x,kind,txt:fmt(h.x,h.raw)+tag+', received after '+fd(t-h.t)});blip(la,.05,.5,a);return}
 const r=node(a),an=random()*6.283;r.k.push(t);r.n++;r.last=t;
+if(!animate)return;
 const flightDuration=RM?1:1100;
 comets.push({s:{x:r.x+Math.cos(an)*240,y:r.y+Math.sin(an)*240},d:r,t0:animationNow(),du:flightDuration,la,x,kind,txt:fmt(x,raw)+tag+', received'});
 soundFX.play({frequency:196*2**(clamp((la+8)/13,0,1)*3),volume:.09,outside:true,duration:flightDuration/1000,account:a});
 if(src&&rpc&&rpcFail<3){want.set(src,{r,t,x});if(want.size>500)want.delete(want.keys().next().value)}}
-function mark(a,kind,t){const p=node(a);p.k.push(t);p.n++;p.last=t;p.pulse=1;
+function mark(a,kind,t,animate=true){const p=node(a);p.k.push(t);p.n++;p.last=t;if(!animate)return;p.pulse=1;
 if(bursts.length<120)bursts.push({d:p,t0:animationNow(),la:-2,kind});if(floats.length<60)floats.push({d:p,t0:animationNow(),txt:kind==='change'?'representative change':'epoch upgrade',kind})}
 function link(sa,r,x,t0){const s=node(sa,r),e=getEdge(s,r),now=timeNow();e.ts.push(now);e.am.push(x);s.n++;s.last=now;
 const i=r.k.indexOf(t0);if(i>=0)r.k.splice(i,1);
 comets.push({s,d:r,t0:animationNow(),du:RM?1:700,la:Math.log10(x),x,kind:'receive',txt:''})}
-function handle(c){
+function handle(c,animate=true,at=timeNow()){
 const b=parseNanoBlock(c.block);if(!b)return;
-const sub=b.subtype||b.type||'other',now=timeNow(),x=Number(c.amount)/1e30,a=b.account||c.account;
+const sub=b.subtype||b.type||'other',now=at,x=Number(c.amount)/1e30,a=b.account||c.account,hash=typeof c.hash==='string'?c.hash.toUpperCase():'',source=typeof (b.link||b.source)==='string'?(b.link||b.source).toUpperCase():b.link||b.source;
 cnt[sub]=(cnt[sub]||0)+1;
-if(sub==='send')ingest(a,b.link_as_account||b.destination,x,now,true,c.hash,c.amount);
-else if(sub==='receive'||sub==='open')land(a,b.link||b.source,x,now,sub==='open',c.amount);
-else if(sub==='change'||sub==='epoch')mark(a,sub,now)}
+if(sub==='send')ingest(a,b.link_as_account||b.destination,x,now,animate,hash,c.amount);
+else if(sub==='receive'||sub==='open')land(a,source,x,now,sub==='open',c.amount,animate);
+else if(sub==='change'||sub==='epoch')mark(a,sub,now,animate)}
 async function resolve(){
 if(!rpc||rpcFail>=3||!want.size)return;
 const hs=[...want.keys()].slice(0,25);
@@ -280,15 +282,16 @@ fitCamera();drawBackground(pn);drawEdges(now);drawAccounts(now);drawWake(pn);dra
 requestAnimationFrame(frame)}
 
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
-function clearAll(){stardust.clear();nodes.clear();edges.clear();sendBy.clear();want.clear();comets.length=bursts.length=floats.length=0;seen=0;cnt={};lastMsg=0;last=null;nSends=0;hubs=[]}
 const dupS=new Set(),dupQ=[];
+function clearAll(){stardust.clear();nodes.clear();edges.clear();sendBy.clear();want.clear();comets.length=bursts.length=floats.length=0;seen=0;cnt={};lastMsg=0;last=null;nSends=0;hubs=[];dupS.clear();dupQ.length=0}
+function rememberHash(hash){if(!hash)return;hash=String(hash).toUpperCase();if(dupS.has(hash))return;dupS.add(hash);dupQ.push(hash);if(dupQ.length>5000)dupS.delete(dupQ.shift())}
 function stop(){stressPlayback=null;$('stressReplay').hidden=true;clearTimeout(timer);if(feedClient){feedClient.stop();feedClient=null}}
 function connect(){
-stop();const u=$('host').value;if(u==='stress'){startStress();return}if(u==='demo'){demo();return}isDemo=false;rpc=new URLSearchParams(location.search).get('rpc')||RPCS[new URL(u).host]||'';rpcFail=0;want.clear();
+stop();clearAll();const u=$('host').value;if(u==='stress'){startStress();return}if(u==='demo'){demo();return}isDemo=false;rpc=new URLSearchParams(location.search).get('rpc')||RPCS[new URL(u).host]||'';rpcFail=0;want.clear();
+for(const event of globalThis.nanoEventCache?.restore()||[]){rememberHash(event.hash);handle(event.message,false,event.lastSeenAt);seen++}prune(timeNow());for(let i=0;i<16;i++)layout();
 feedClient=createNanoFeed(u,{
-onPacket:m=>{if(m.topic!=='confirmation'||!m.message)return;const c=m.message;
-if(c.hash){if(dupS.has(c.hash))return;dupS.add(c.hash);dupQ.push(c.hash);if(dupQ.length>5000)dupS.delete(dupQ.shift())}
-seen++;lastMsg=timeNow();handle(c)},
+onPacket:m=>{if(m.topic!=='confirmation'||!m.message)return;const c=m.message,at=Date.now();globalThis.nanoEventCache?.record(m,at);
+if(c.hash&&dupS.has(String(c.hash).toUpperCase()))return;rememberHash(c.hash);seen++;lastMsg=at;handle(c,true,at)},
 onStatus:t=>status(t,t.startsWith('Connecting')||t.includes('reconnecting')?'':'on'),
 onGap:()=>{}
 })}
@@ -337,7 +340,7 @@ if(t>nx){nx=t+45e3;const h=pick(hb);for(let i=0;i<10;i++)setTimeout(()=>{if(isDe
 one();seen++;lastMsg=t;timer=setTimeout(tick,-Math.log(random())*900)};
 tick()}
 
-function hud(){const now=timeNow();if(!isDemo&&store.length)try{localStorage.setItem('ag-ev',JSON.stringify(store.slice(-600)))}catch(e){};
+function hud(){const now=timeNow();
 const bd=Object.entries(cnt).map(([k,v])=>v+' '+k).join(', ');
 $('stats').textContent=`${nodes.size} accounts, ${edges.size} links, ${nSends} sends in the last ${fd(winMs)}`+
 `\n${nPend} sends seen live not yet seen received`+
@@ -358,9 +361,7 @@ setInterval(hud,500);setInterval(resolve,1500);
 const wq=new URLSearchParams(location.search).get('ws');if(/^wss?:\/\//.test(wq||'')){$('host').add(new Option('custom: '+new URL(wq).host,wq),0);$('host').value=wq}
 if(/[?&]demo/.test(location.search))$('host').value='demo';
 if(new URLSearchParams(location.search).has('stress'))$('host').value='stress';
-size();
-if(!/[?&](demo|stress)/.test(location.search)){try{const old=JSON.parse(localStorage.getItem('ag-ev')||'[]'),n0=timeNow()-winMs;for(const[a,b,x,t,raw]of old)if(t>n0){ingest(a,b,x,t,false,undefined,raw);store.push([a,b,x,t,raw])}for(let i=0;i<300;i++)layout()}catch(e){}}
-connect();requestAnimationFrame(frame);
+size();connect();requestAnimationFrame(frame);
 })();
 </script>
 </body>

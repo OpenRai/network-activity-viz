@@ -33,11 +33,12 @@
 <main><div class="controls"><label>Node <select id="feed" aria-label="Node"></select></label></div>
 <div id="connection" role="status">Connecting to the selected node…</div>
 <div class="layout"><section class="panel"><div class="heading"><span>Block lattice</span><span>LAST 60 SECONDS → NOW</span></div><div class="legend"><span class="send">■ Send block</span><span class="receive">● Receive / open block</span><span>◆ Change block</span><span class="send">Each block is independently confirmed</span></div><div id="viewport"><svg id="lattice" role="img" aria-label="Account chains over time with links between send and receive blocks"></svg></div><div class="metrics"><div><strong id="sends">0</strong><small>OBSERVED SENDS</small></div><div><strong id="receives">0</strong><small>OBSERVED RECEIVES</small></div><div><strong id="pending">0</strong><small>OBSERVED BLOCKS</small></div></div><div class="note">Each row is an account, each shape a confirmed block. Horizontal connections follow the block’s previous hash; curved connections pair a receive’s source hash with its send. Dashed chains indicate missing history. Select any block for details.</div></section>
-<aside><section class="panel"><div class="heading">02 / ORV · CONSENSUS</div><div class="content"><span class="badge" id="voteState">VOTE STREAM UNOBSERVED</span><p id="orv">Representatives vote on blocks. Confirmation is the node’s reported outcome.</p><div id="reps"></div><p id="confirmation"></p></div><div class="note">Vote count measures observed activity. Voting weight and quorum require a representative-weight snapshot; neither is inferred from counts.</div></section><section class="panel" style="margin-top:16px"><div class="heading">INSPECT A BLOCK</div><div class="content" id="details">Select a block in the lattice to inspect its account, amount, hash and paired transfer.</div></section></aside></div></main>
+<aside><section class="panel"><div class="heading">02 / VOTE ACTIVITY</div><div class="content"><span class="badge" id="voteState">VOTE STREAM UNOBSERVED</span><p id="orv">A pulse marks a visible block named in a vote received by this node. The stream may be partial.</p><p id="confirmation"></p></div><div class="note">Counts show messages received by this node, not voting weight or quorum.</div></section><section class="panel" style="margin-top:16px"><div class="heading">INSPECT A BLOCK</div><div class="content" id="details">Select a block in the lattice to inspect its account, amount, hash and paired transfer.</div></section></aside></div></main>
 <script src="js/gallery-nav.js"></script>
 <script src="js/page-settings.js"></script>
 <script src="js/format.js"></script>
 <script src="js/event-utils.js"></script>
+<script src="js/event-cache.js"></script>
 <script src="js/nano-feed.js"></script>
 <script>
 'use strict';
@@ -54,13 +55,17 @@ for(let i=0;i<300;i++){
 demo.sort((a,b)=>a.at-b.at);const demoHeads=new Map();for(const p of demo){if(p.topic==='confirmation'){p.message.block.previous=demoHeads.get(p.message.account);demoHeads.set(p.message.account,p.message.hash)}}let demoIndex=0;
 const short = value => shortAccount(value, false);
 const amount = raw => formatNanoAmount(raw, true);
-function ingest(packet,at){
+function ingest(packet,at,lastSeenAt=Date.now(),persist=false){
  appendBounded(recording,{...packet,observedAt:at},10000);
  const m=packet.message||{};
- if(packet.topic==='vote'&&m.account){appendBounded(votes,{at,rep:m.account,hashes:m.blocks||[]},5000);return}
- if(packet.topic!=='confirmation'||!m.hash||!m.account||seen.has(m.hash))return;
- seen.add(m.hash);const b=m.block||{};
- blocks.push({hash:m.hash,account:m.account,at,amount:m.amount,subtype:b.subtype||b.type||'unknown',previous:b.previous,source:b.link||b.source,destination:b.link_as_account||b.destination,confirmation:m.confirmation_type,election:m.election_info});
+ if(packet.topic==='vote'&&m.account){appendBounded(votes,{at,rep:m.account,hashes:(m.blocks||[]).map(hash=>String(hash).toUpperCase())},5000);return}
+ if(packet.topic!=='confirmation')return;
+ const cached=persist?globalThis.nanoEventCache?.record(packet,lastSeenAt):null;
+ if(!m.hash||!m.account)return;
+ const hash=String(m.hash).toUpperCase();
+ if(seen.has(hash)){const existing=blocks.find(block=>block.hash===hash);if(existing)existing.lastSeenAt=cached?.event.lastSeenAt||lastSeenAt;return}
+ seen.add(hash);const b=parseNanoBlock(m.block)||{},source=b.link||b.source;
+ blocks.push({hash,account:m.account,at,lastSeenAt:cached?.event.lastSeenAt||lastSeenAt,amount:m.amount,subtype:b.subtype||b.type||'unknown',previous:typeof b.previous==='string'?b.previous.toUpperCase():b.previous,source:typeof source==='string'?source.toUpperCase():source,destination:b.link_as_account||b.destination,confirmation:m.confirmation_type,election:m.election_info});
  if(blocks.length>5000){const removed=blocks.shift();seen.delete(removed.hash)}
 }
 function reset(){recording=[];blocks=[];votes=[];seen=new Set();clock=0;demoIndex=0;selected=null;$('details').textContent='Select a block to inspect it.'}
@@ -71,8 +76,9 @@ function connectSelected(){
  if(choice==='demo'||choice==='stress'){startDemo(choice==='stress');return}
  mode='live';let url;try{url=new URL(choice)}catch{connection='Choose a valid Nano websocket.';return}
  started=performance.now();
+ for(const event of globalThis.nanoEventCache?.restore()||[])ingest({topic:'confirmation',message:event.message},-event.elapsedMs,event.lastSeenAt);
  feedClient=createNanoFeed(url.href,{
-  onPacket:packet=>ingest(packet,performance.now()-started),
+  onPacket:packet=>ingest(packet,performance.now()-started,Date.now(),true),
   onStatus:status=>{connection=status},
   onGap:reason=>{appendBounded(recording,{topic:'observer_gap',observedAt:performance.now()-started,reason},10000)}
 });
@@ -80,7 +86,8 @@ function connectSelected(){
 gallerySettings.onNodeChange(connectSelected);
 gallerySettings.onMemoryChange(()=>{winMs=gallerySettings.memoryMs;render()});
 function el(tag,attrs={},text){const n=document.createElementNS(NS,tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n}
-function inspect(b){selected=b.hash;const send=blocks.find(s=>s.hash===b.source),receive=blocks.find(r=>r.source===b.hash);$('details').textContent=[b.subtype.toUpperCase()+' · CONFIRMED','Account: '+b.account,'Amount: '+amount(b.amount),'Hash: '+b.hash,'Observed: '+(b.at/1000).toFixed(3)+' s','Confirmation: '+(b.confirmation||'reported by node'),send?'Send → receive: '+((b.at-send.at)/1000).toFixed(3)+' s':receive?'Send → receive: '+((receive.at-b.at)/1000).toFixed(3)+' s':b.subtype==='send'?'Receive not observed in this session.':'Source block not observed in this session.',b.election?'Election info: '+JSON.stringify(b.election):''].filter(Boolean).join('\n')}
+function inspect(b){selected=b.hash;updateInspection(b)}
+function updateInspection(b){const send=blocks.find(s=>s.hash===b.source),receive=blocks.find(r=>r.source===b.hash),reps=new Set(votes.filter(v=>v.at<=clock&&v.at>=clock-winMs&&v.hashes.includes(b.hash.toUpperCase())).map(v=>v.rep));$('details').textContent=[b.subtype.toUpperCase()+' · CONFIRMED','Account: '+b.account,'Amount: '+amount(b.amount),'Hash: '+b.hash,mode==='live'&&b.lastSeenAt?'Seen by this node: '+Math.max(0,(Date.now()-b.lastSeenAt)/1000).toFixed(1)+' s ago':'Observer time: '+(b.at/1000).toFixed(3)+' s','Representatives this node observed voting for this block: '+reps.size,'Confirmation: '+(b.confirmation||'reported by node'),send?'Send → receive: '+((b.at-send.at)/1000).toFixed(3)+' s':receive?'Send → receive: '+((receive.at-b.at)/1000).toFixed(3)+' s':b.subtype==='send'?'Receive not observed in this session.':'Source block not observed in this session.',b.election?'Election info: '+JSON.stringify(b.election):''].filter(Boolean).join('\n')}
 function exitOpacity(at){return Math.min(1,Math.max(0,(60000-clock+at)/2400));}
 function render(){
  $('mode').textContent=(mode==='sim'?'SIMULATION':mode==='stress'?'STRESS TEST':'LIVE OBSERVER')+' · XNO';$('connection').textContent=connection;
@@ -95,10 +102,12 @@ function render(){
  if(['receive','open'].includes(b.subtype)){const s=byHash.get(b.source);if(s&&accounts.includes(s.account)){const sx=Math.max(190,x(s.at)),sy=y(s.account);svg.append(el('path',{d:`M${sx},${sy} C${sx+35},${sy} ${px-35},${py} ${px},${py}`,fill:'none',stroke:'#5df0cc','stroke-opacity':.55*exitOpacity(b.at),'marker-end':'url(#arrow)'}))}}
 
  }
- for(const b of recent){if(!accounts.includes(b.account))continue;const px=x(b.at),py=y(b.account),color=b.subtype==='send'?'#ffbb71':['receive','open'].includes(b.subtype)?'#5df0cc':'#a69aff';const g=el('g',{class:'block',opacity:exitOpacity(b.at),tabindex:0,role:'button','aria-label':b.subtype+' '+short(b.account)+' '+amount(b.amount)});let shape=b.subtype==='change'?el('path',{d:`M${px},${py-7} l7,7 -7,7 -7,-7 Z`,fill:color}):b.subtype==='send'?el('rect',{x:px-6,y:py-6,width:12,height:12,rx:2,fill:color}):el('circle',{cx:px,cy:py,r:6,fill:color});g.append(shape,el('title',{},b.subtype+' · '+amount(b.amount)+' · '+b.hash));if(clock-b.at<800)g.append(el('circle',{cx:px,cy:py,r:10+(clock-b.at)/40,fill:'none',stroke:color,'stroke-opacity':1-(clock-b.at)/800}));g.onclick=()=>inspect(b);g.onkeydown=e=>{if(e.key==='Enter')inspect(b)};svg.append(g)}
+ const votePulseAt=new Map();for(const vote of votes)if(vote.at<=clock&&vote.at>clock-900)for(const hash of vote.hashes)votePulseAt.set(hash,Math.max(votePulseAt.get(hash)||0,vote.at));
+ for(const b of recent){if(!accounts.includes(b.account))continue;const px=x(b.at),py=y(b.account),color=b.subtype==='send'?'#ffbb71':['receive','open'].includes(b.subtype)?'#5df0cc':'#a69aff';const g=el('g',{class:'block',opacity:exitOpacity(b.at),tabindex:0,role:'button','aria-label':b.subtype+' '+short(b.account)+' '+amount(b.amount)});let shape=b.subtype==='change'?el('path',{d:`M${px},${py-7} l7,7 -7,7 -7,-7 Z`,fill:color}):b.subtype==='send'?el('rect',{x:px-6,y:py-6,width:12,height:12,rx:2,fill:color}):el('circle',{cx:px,cy:py,r:6,fill:color});g.append(shape);const voteAt=votePulseAt.get(b.hash.toUpperCase());if(voteAt!==undefined){const age=clock-voteAt,phase=age/900;g.append(el('circle',{cx:px,cy:py,r:11+phase*9,fill:'none',stroke:'#a69aff','stroke-width':2,'stroke-opacity':1-phase}))}g.append(el('title',{},b.subtype+' · '+amount(b.amount)+' · '+b.hash));if(clock-b.at<800)g.append(el('circle',{cx:px,cy:py,r:10+(clock-b.at)/40,fill:'none',stroke:color,'stroke-opacity':1-(clock-b.at)/800}));g.onclick=()=>inspect(b);g.onkeydown=e=>{if(e.key==='Enter')inspect(b)};svg.append(g)}
  if(!accounts.length)svg.append(el('text',{x:260,y:180},mode==='sim'?'Starting demo…':'Waiting for confirmed blocks from the websocket…'));
  $('sends').textContent=shown.filter(b=>b.subtype==='send').length;$('receives').textContent=shown.filter(b=>['receive','open'].includes(b.subtype)).length;$('pending').textContent=shown.length;
- const visibleVotes=votes.filter(v=>v.at<=clock&&v.at>clock-10000),counts=new Map();visibleVotes.forEach(v=>counts.set(v.rep,(counts.get(v.rep)||0)+1));$('voteState').textContent=mode!=='live'?'SIMULATED VOTES':votes.length?'VOTE MESSAGES OBSERVED':'VOTE STREAM UNOBSERVED';$('orv').textContent=mode==='live'&&!votes.length?'Confirmation stream only so far. This endpoint may restrict votes. Representative activity and election timing are unknown.':visibleVotes.length+(mode==='live'?' vote messages':' simulated vote messages')+' in the last 10 seconds. Representatives endorse block hashes; the node reports confirmation.';$('reps').replaceChildren();[...counts].sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([rep,count])=>{const d=document.createElement('div');d.className='rep';d.textContent=short(rep)+' · '+count+' votes';$('reps').append(d)});const latest=shown.at(-1);$('confirmation').textContent=latest?'Latest confirmation: '+short(latest.hash)+' · '+(latest.confirmation||'node reported'):'';
+ const visibleVotes=votes.filter(v=>v.at<=clock&&v.at>clock-10000);$('voteState').textContent=mode!=='live'?'SIMULATED VOTES':votes.length?'VOTE MESSAGES OBSERVED':'VOTE STREAM UNOBSERVED';$('orv').textContent=mode==='live'&&!votes.length?'No vote messages received from this node yet.':visibleVotes.length+(mode==='live'?' vote messages received by this node':' simulated vote messages')+' in the last 10 seconds.';const latest=shown.at(-1);$('confirmation').textContent=latest?'Latest confirmation: '+short(latest.hash)+' · '+(latest.confirmation||'node reported'):'';
+ if(selected){const selectedBlock=shown.find(block=>block.hash===selected);if(selectedBlock)updateInspection(selectedBlock)}
 }
 let painted=0;function frame(now){if(playing){if(mode==='sim'||mode==='stress'){clock+=Math.min(now-last,100)*(mode==='stress'?30:1);while(demoIndex<demo.length&&demo[demoIndex].at<=clock){const p=demo[demoIndex++];ingest(p,p.at)}}else clock=now-started}last=now;if(now-painted>80){render();painted=now}requestAnimationFrame(frame)}connectSelected();requestAnimationFrame(frame);
 </script></html>

@@ -1,6 +1,5 @@
 (()=>{
 const $=id=>document.getElementById(id);
-const EVENT_CACHE_KEY='nano-send-mountains-events-v1',EVENT_CACHE_TTL=60*60*1000;
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const cv=$('c'),cx=cv.getContext('2d'),ov=$('o'),ox=ov.getContext('2d');
 let T=gallerySettings.memoryMs,Te=6e4,t0=Date.now(),cnt={},lastMsg=0,mode='sqrt',ev=[],markers=[],feedClient=null,last=null,dpr=1,tx=0,simulation=null;
@@ -109,28 +108,18 @@ if(!silent)soundFX.play({frequency:196*2**(Math.max(0,Math.min(1,(la+8)/13))*3),
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
 function stop(){simulation=null;if(feedClient){feedClient.stop();feedClient=null}}
 function resetStream(){ev=[];markers=[];cnt={};lastMsg=0;last=null;t0=Date.now();rangeLow=rangeHigh=null;lastB=0;dupS.clear();dupQ.length=0;sentHashes.clear();sentQueue.length=0}
-let cachedEvents=[];
-function readCache(){try{const value=JSON.parse(localStorage.getItem(EVENT_CACHE_KEY)||'[]');return Array.isArray(value)?value:[]}catch{return []}}
 function restoreCache(){
-const cached=readCache();cachedEvents=[];
-const now=Date.now();for(const item of cached){if(!item||now-item.at<0||now-item.at>EVENT_CACHE_TTL||!['send','receive','open'].includes(item.subtype))continue;
-cachedEvents.push(item);t0=Math.min(t0,item.at);
-add(item.amount,item.hash,item.at,item.subtype,item.account,true,item.at,item.source||'');if(item.subtype==='send'&&item.hash){sentHashes.add(item.hash);sentQueue.push(item.hash)}}
+for(const event of globalThis.nanoEventCache?.restore()||[]){const item=event.message,block=parseNanoBlock(item.block)||{},sub=block.subtype||'other';if(!['send','receive','open'].includes(sub))continue;
+const at=event.lastSeenAt,hash=event.hash;t0=Math.min(t0,at);dupS.add(hash);dupQ.push(hash);
+add(item.amount,hash,at,sub,item.account,true,at,(block.link||'').toUpperCase());if(sub==='send'){sentHashes.add(hash);sentQueue.push(hash)}}
 }
-let cacheTimer=0;
-function flushCache(){cacheTimer=0;try{localStorage.setItem(EVENT_CACHE_KEY,JSON.stringify(cachedEvents))}catch{}}
-function persistEvent(item){if(simulation)return;
-cachedEvents=cachedEvents.filter(e=>Date.now()-e.at<=EVENT_CACHE_TTL);cachedEvents.push(item);if(cachedEvents.length>3000)cachedEvents=cachedEvents.slice(-3000);
-if(!cacheTimer)cacheTimer=setTimeout(flushCache,500)}
-addEventListener('pagehide',flushCache);
-function handleConfirmation(packet,at=Date.now()){
+function handleConfirmation(packet,at=Date.now(),replay=false){
 if(packet.topic!=='confirmation'||!packet.message)return;
-const c=packet.message;if(c.hash){if(dupS.has(c.hash))return;dupS.add(c.hash);dupQ.push(c.hash);if(dupQ.length>5000)dupS.delete(dupQ.shift())}
+const c=packet.message,hash=typeof c.hash==='string'?c.hash.toUpperCase():'';if(hash){if(!replay&&!simulation)globalThis.nanoEventCache?.record(packet,at);if(dupS.has(hash))return;dupS.add(hash);dupQ.push(hash);if(dupQ.length>5000)dupS.delete(dupQ.shift())}
 const b=parseNanoBlock(c.block)||{},sub=b.subtype||'other';lastMsg=at;cnt[sub]=(cnt[sub]||0)+1;
-if(sub==='send'&&c.hash){sentHashes.add(c.hash);sentQueue.push(c.hash);if(sentQueue.length>5000)sentHashes.delete(sentQueue.shift())}
+if(sub==='send'&&hash){sentHashes.add(hash);sentQueue.push(hash);if(sentQueue.length>5000)sentHashes.delete(sentQueue.shift())}
 if(!['send','receive','open'].includes(sub))return;
-const account=c.account||b.account||'';add(c.amount,c.hash,at,sub,account,false,Date.now(),b.link||'');
-persistEvent({at,subtype:sub,amount:c.amount,hash:c.hash,account,source:b.link||''});
+const account=c.account||b.account||'',source=typeof b.link==='string'?b.link.toUpperCase():'';add(c.amount,hash,at,sub,account,replay,replay?at:Date.now(),source);
 }
 function startSimulation(stress){stop();resetStream();const data=stress?createStressDemo():createStressDemo({transfers:240,duration:120000});
 simulation={...data,index:0,start:performance.now(),scale:stress?30:1};status(stress?'STRESS TEST · fictional transfers':'SIMULATED DATA','sim')}

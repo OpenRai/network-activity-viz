@@ -29,17 +29,25 @@ function accountKey(account) { return typeof account==='string'?account.replace(
 function rememberAccount(account) {
   if(account&&!state.accountOrder.has(account))state.accountOrder.set(account,state.accountOrder.size);
 }
-function ingest(event, at) {
+function ingest(event, at, lastSeenAt = Date.now(), persist = false) {
   appendBounded(state.recording,{observedAt:at,topic:event.topic,message:event.message},10000);
   const m=event.message||{};
   if(event.topic==='vote'&&typeof m.account==='string') {
-    appendBounded(state.votes,{at,rep:accountKey(m.account),hashes:Array.isArray(m.blocks)?m.blocks:[]},5000);
+    appendBounded(state.votes,{at,rep:accountKey(m.account),hashes:Array.isArray(m.blocks)?m.blocks.map(hash=>String(hash).toUpperCase()):[]},5000);
     return;
   }
-  if(event.topic!=='confirmation'||typeof m.hash!=='string'||typeof m.account!=='string'||state.seen.has(m.hash))return;
+  if(event.topic!=='confirmation')return;
+  const cached=persist?globalThis.nanoEventCache?.record(event,lastSeenAt):null;
+  if(typeof m.hash!=='string'||typeof m.account!=='string')return;
+  const hash=m.hash.toUpperCase();
+  if(state.seen.has(hash)){
+    const existing=state.blocks.find(block=>block.hash===hash);
+    if(existing)existing.lastSeenAt=cached?.event.lastSeenAt||lastSeenAt;
+    return;
+  }
   const b=parseNanoBlock(m.block)||{};
   const subtype=b.subtype||m.subtype||b.type||'unknown';
-  const block={hash:m.hash,account:accountKey(m.account),at,raw:m.amount,subtype,previous:b.previous,source:b.link||b.source,destination:accountKey(b.link_as_account||b.destination),confirmation:m.confirmation_type||'reported by node'};
+  const block={hash,account:accountKey(m.account),at,lastSeenAt:cached?.event.lastSeenAt||lastSeenAt,raw:m.amount,subtype,previous:typeof b.previous==='string'?b.previous.toUpperCase():b.previous,source:typeof (b.link||b.source)==='string'?(b.link||b.source).toUpperCase():b.link||b.source,destination:accountKey(b.link_as_account||b.destination),confirmation:m.confirmation_type||'reported by node'};
   rememberBlock(block);
 }
 function rememberBlock(block){
@@ -58,8 +66,9 @@ function connectSelected(){
   if(selected==='demo'||selected==='stress'){startDemo(selected==='stress');return}
   let url;try{url=new URL(selected);if(!['ws:','wss:'].includes(url.protocol))throw Error('protocol')}catch{state.status='Choose a valid Nano websocket.';render();return}
   disconnect();clearRecording();state.mode='live';state.playing=true;state.started=performance.now();state.status='Connecting to '+url.host+'…';
+  for(const event of globalThis.nanoEventCache?.restore()||[])ingest({topic:'confirmation',message:event.message},-event.elapsedMs,event.lastSeenAt);
   feedClient=createNanoFeed(url.href,{
-    onPacket:packet=>ingest(packet,performance.now()-state.started),
+    onPacket:packet=>ingest(packet,performance.now()-state.started,Date.now(),true),
     onStatus:status=>{state.status=status},
     onGap:reason=>{
       appendBounded(state.recording,{topic:'observer_gap',observedAt:performance.now()-state.started,reason},10000);
@@ -76,8 +85,9 @@ function model(){
  const blocks=state.blocks.filter(b=>b.at<=state.time&&b.at>=state.time-state.windowMs),byHash=new Map(blocks.map(b=>[b.hash,b]));
  const receives=new Map(blocks.filter(b=>['receive','open'].includes(b.subtype)).map(b=>[b.source,b]));
  const transfers=blocks.filter(b=>b.subtype==='send').map(send=>({send,receive:receives.get(send.hash)}));
- const votes=state.votes.filter(v=>v.at<=state.time&&v.at>=state.time-state.windowMs),recent=blocks.filter(b=>b.at>=state.time-60000);
- return {blocks,byHash,receives,transfers,votes,recent};
+ const votes=state.votes.filter(v=>v.at<=state.time&&v.at>=state.time-state.windowMs),recent=blocks.filter(b=>b.at>=state.time-60000),votePulses=new Map();
+ for(const vote of votes)if(vote.at>state.time-900)for(const hash of vote.hashes)votePulses.set(hash,Math.max(votePulses.get(hash)||0,vote.at));
+ return {blocks,byHash,receives,transfers,votes,recent,votePulses};
 }
 function inspect(block){state.selected=block.hash;render()}
 function updatePanels(m){
@@ -90,27 +100,22 @@ function updatePanels(m){
  updateVotePulse(m);
 }
 function updateConsensusPanel(m){
- const recentVotes=m.votes.filter(v=>v.at>state.time-10000),repCounts=new Map();
- recentVotes.forEach(v=>repCounts.set(v.rep,(repCounts.get(v.rep)||0)+1));
+ const recentVotes=m.votes.filter(v=>v.at>state.time-10000);
  $('voteState').textContent=state.mode!=='live'?'SIMULATED VOTES · '+(state.mode==='stress'?'STRESS TEST':'DEMO'):m.votes.length?'VOTE MESSAGES OBSERVED':'VOTE STREAM UNOBSERVED';
- $('orvSummary').textContent=state.mode==='live'&&!m.votes.length?'No vote messages received from the selected node.':recentVotes.length+(state.mode==='live'?' vote messages':' simulated vote messages')+' / last 10s · '+repCounts.size+' representatives';
- $('reps').replaceChildren();
- for(const [rep,count]of [...repCounts].sort((a,b)=>b[1]-a[1]).slice(0,4)){
-  const row=document.createElement('div');row.className='rep';const name=document.createElement('span');name.textContent=short(rep);const val=document.createElement('span');val.textContent=count+' votes';row.append(name,val);$('reps').append(row);
- }
+ $('orvSummary').textContent=state.mode==='live'&&!m.votes.length?'No vote messages received from this node yet.':recentVotes.length+(state.mode==='live'?' vote messages received by this node':' simulated vote messages')+' in the last 10s.';
 }
 function updateBlockDetails(m){
  const selected=m.byHash.get(state.selected);
  let detail='Select a mark or a recent block to inspect the confirmed block.';
  if(selected){
   const send=selected.subtype==='send'?selected:m.byHash.get(selected.source),receive=selected.subtype==='send'?m.receives.get(selected.hash):selected;
-  const lines=[selected.subtype.toUpperCase()+' · CONFIRMED',amount(selected.raw),'Account: '+selected.account,'Hash: '+selected.hash,'Observer time: '+seconds(selected.at)];
+  const lines=[selected.subtype.toUpperCase()+' · CONFIRMED',amount(selected.raw),'Account: '+selected.account,'Hash: '+selected.hash,state.mode==='live'&&selected.lastSeenAt?'Seen by this node: '+seconds(Math.max(0,Date.now()-selected.lastSeenAt))+' ago':'Observer time: '+seconds(selected.at)];
   if(send&&receive)lines.push('Observer receipt interval (not settlement latency): '+seconds(receive.at-send.at));
   else if(selected.subtype==='send')lines.push('Send is final. No receive referencing it is present in this recording.');
   else if(['receive','open'].includes(selected.subtype))lines.push('Source send predates or is missing from this recording.');
   lines.push('Confirmation: '+selected.confirmation);
-  const endorsers=new Set(m.votes.filter(v=>v.hashes.includes(selected.hash)).map(v=>v.rep));
-  lines.push('Observed voting reps for this hash: '+endorsers.size);
+  const endorsers=new Set(m.votes.filter(v=>v.hashes.includes(selected.hash.toUpperCase())).map(v=>v.rep));
+  lines.push('Representatives this node observed voting for this block: '+endorsers.size);
   detail=lines.join('\n');
  }
  $('detail').textContent=detail;
