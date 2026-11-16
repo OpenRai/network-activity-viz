@@ -3,7 +3,7 @@
     { href: 'starmap.html', name: 'Starmap', detail: 'Account galaxy' },
     { href: 'nano-atlas.html', name: 'Nano Atlas', detail: 'Live account network' },
     { href: 'eventsky.html', name: 'Eventsky', detail: 'Events through time' },
-    { href: 'send-mountains.html', name: 'Send mountains', detail: 'Amount landscape' }
+    { href: 'netloom.html', name: 'NetLoom', detail: 'Block Threads' }
   ];
   const current = location.pathname.split('/').pop() || 'index.html';
   const style = document.createElement('style');

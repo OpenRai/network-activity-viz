@@ -130,10 +130,10 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap}) {
     onPacket(packet);publish();
   }
   function wake() {
-    if(stopped||document.hidden)return;
+    if(stopped)return;
     if(ws&&ws.readyState===WebSocket.OPEN){
-      if(pingSentAt!==null&&performance.now()-pingSentAt>=10000)reconnect('Heartbeat interrupted while tab was inactive');
-      else ping();
+      clearTimeout(pongTimer);pongTimer=null;pingSentAt=null;
+      ping();
     }else if(retryTimer!==null){clearTimeout(retryTimer);retryTimer=null;connect()}
   }
   document.addEventListener('visibilitychange',wake);

@@ -7,7 +7,7 @@ A collection of independent, live-capable visualizations of Nano network activit
 - **Starmap** — active accounts and observed transfers in a constellation view.
 - **Nano Atlas** — live account network with block chains and confirmed transfer paths.
 - **Eventsky** — account-lane timeline with linked sends, receives and amount-scaled marks.
-- **Send mountains** — confirmed send amounts as a live density landscape.
+- **NetLoom / Block Threads** — confirmed Nano blocks woven into a live cybernetic landscape.
 
 The visualizations can run in demo mode or connect to supported Nano websocket feeds. Live timestamps represent the local observer's receipt time; a feed may restrict topics or all-account subscriptions.
 

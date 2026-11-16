@@ -3,16 +3,19 @@ const $=id=>document.getElementById(id);
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const cv=$('c'),cx=cv.getContext('2d'),ov=$('o'),ox=ov.getContext('2d');
 let T=gallerySettings.memoryMs,Te=6e4,t0=Date.now(),cnt={},lastMsg=0,mode='sqrt',ev=[],markers=[],feedClient=null,last=null,dpr=1,tx=0,simulation=null;
-const soundFX=createSoundFX({profile:'alien',onStatus:message=>{$('audioState').textContent=message}}),soundSet=$('soundSet');
-try{const saved=localStorage.getItem('ag-mountains-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
+const soundFX=createSoundFX({profile:'cyber',onStatus:message=>{$('audioState').textContent=message}}),soundSet=$('soundSet');
+globalThis.netloomSoundFX=soundFX;
+try{const saved=localStorage.getItem('netloom-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
 soundFX.setSoundSet(soundSet.value);
-soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('ag-mountains-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
+soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('netloom-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
 $('snd').onchange=()=>{if(!$('snd').checked){soundFX.disable();return}soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{$('audioState').textContent='Audio paused · turn sound off and on to retry.'})};
-let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,drift=0,vignette,w,h,board,boardContext,glow,glowContext;
+let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,bandWeights=new Map(),drift=0,vignette,w,h,board,boardContext,glow,glowContext,camera={x:0,y:0,s:1},cameraControls;
 const PLANE_W=1600,PLANE_H=1000;
 function size(){
- dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;
- cv.width=PLANE_W;cv.height=PLANE_H;
+ const oldW=w||innerWidth,oldH=h||innerHeight;dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;
+ if(cameraControls){camera.x+=(w-oldW)/2;camera.y+=(h-oldH)/2}else{camera={x:w/2,y:h/2,s:1};cameraControls=createMapControls(ov,camera,()=>({width:w,height:h,cx:w/2,cy:h/2}))}
+ cv.width=Math.round(PLANE_W*dpr);cv.height=Math.round(PLANE_H*dpr);
+ cx.setTransform(dpr,0,0,dpr,0,0);
  Object.assign(cv.style,{width:PLANE_W+'px',height:PLANE_H+'px',inset:'0 auto auto 0',transformOrigin:'0 0',willChange:'transform',imageRendering:'auto'});
  ov.width=Math.round(w*dpr);ov.height=Math.round(h*dpr);
  ox.setTransform(dpr,0,0,dpr,0,0);
@@ -41,10 +44,20 @@ function build(now){
  rangeLow=rangeLow===null?targetLow:rangeLow+(targetLow-rangeLow)*blend;
  rangeHigh=rangeHigh===null?targetHigh:rangeHigh+(targetHigh-rangeHigh)*blend;
  const low=rangeLow,high=rangeHigh;
+ const bandSize=.25,bandCounts=new Map();for(const amount of amounts){const band=Math.floor(amount/bandSize);bandCounts.set(band,(bandCounts.get(band)||0)+1)}
+ const maxBandCount=Math.max(1,...bandCounts.values()),firstBand=Math.floor(low/bandSize),lastBand=Math.ceil(high/bandSize),bands=[];
+ for(let band=firstBand;band<lastBand;band++){
+  const from=Math.max(low,band*bandSize),to=Math.min(high,(band+1)*bandSize),target=1+2*Math.sqrt((bandCounts.get(band)||0)/maxBandCount),previous=bandWeights.get(band)??1,weight=previous+(target-previous)*blend;
+  bandWeights.set(band,weight);if(to>from)bands.push({from,to,weight});
+ }
+ for(const band of [...bandWeights.keys()])if(band<firstBand-2||band>lastBand+2)bandWeights.delete(band);
+ const bandSpace=bands.reduce((sum,band)=>sum+(band.to-band.from)/bandSize*band.weight,0);
+ const amountY=value=>{let position=0;value=Math.max(low,Math.min(high,value));for(const band of bands){if(value>=band.to){position+=(band.to-band.from)/bandSize*band.weight;continue}if(value>band.from)position+=(value-band.from)/bandSize*band.weight;break}return 50+position/bandSpace*870};
+ const amountAtY=ratio=>{let distance=Math.max(0,Math.min(1,ratio))*bandSpace;for(const band of bands){const segment=(band.to-band.from)/bandSize*band.weight;if(distance<=segment)return band.from+distance/ band.weight*bandSize;distance-=segment}return high};
  const cells=[];
  for(const m of visible){
   const seed=hashCode(m.hash||String(m.at)),age=now-m.at;
-  const x=60+(1-age/Te)*1460,y=50+Math.max(0,Math.min(1,(m.la-low)/(high-low)))*870;
+  const x=60+(1-age/Te)*1460,y=amountY(m.la);
   const cell={m,seed,x,y,width:9+seed%29,height:7+(seed>>>8)%9,age};cells.push(cell);
  }
  const receives=new Map(cells.filter(cell=>cell.m.subtype!=='send'&&cell.m.source).map(cell=>[cell.m.source,cell]));
@@ -74,7 +87,7 @@ function build(now){
  c.globalAlpha=l.globalAlpha=1;
  c.font='11px monospace';c.fillStyle='#408099';
  for(let i=0;i<=6;i++){c.fillText(i===6?'NOW':'−'+fd(Te*(1-i/6)),60+i*240,970)}
- for(let i=0;i<=8;i++){c.fillText(fmt(10**(low+(high-low)*i/8)),8,50+i*108)}
+ for(let i=0;i<=8;i++){c.fillText(fmt(10**amountAtY(i/8)),8,50+i*108)}
  // Bake bloom at quarter resolution; the display loop only composites one texture.
  c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.5;c.drawImage(glow,0,0,PLANE_W,PLANE_H);c.restore();
  boardWindow=Te;
@@ -82,13 +95,19 @@ function build(now){
 const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
 const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2))+' XNO';
 function render(){
- const scale=Math.min(w/1450,h/850)*1.05;
- drift+=((RM?0:tx*12)-drift)*.12;
+ const scale=Math.min(w/1450,h/850)*1.35;
+ drift+=((RM||cameraControls.isGesture()?0:tx*12)-drift)*.12;
  // Animate the cached plane on the compositor, without repainting the viewport.
- const elapsed=Math.max(0,Date.now()-lastB),ratio=boardWindow/Te;
- const shift=1520*(1-ratio)-elapsed/Te*1460;
+ const elapsed=Math.max(0,Math.min(Te,Date.now()-lastB)),ratio=boardWindow/Te;
  const a=scale*.91,b=-scale*.27,c=scale*.48,d=scale*.59;
- cv.style.transform=`matrix(${a*ratio},${b*ratio},${c},${d},${w*.56+drift-a*800-c*500+a*shift},${h*.49-b*800-d*500+b*shift})`;
+ const focusX=1520+elapsed/Te*1460,focusY=970;
+ if(cameraControls.springing()){
+  camera.x+=(w/2-camera.x)*.12;camera.y+=(h/2-camera.y)*.12;camera.s+=(1-camera.s)*.12;
+  if(Math.abs(camera.x-w/2)<.05&&Math.abs(camera.y-h/2)<.05&&Math.abs(camera.s-1)<.0005){camera.x=w/2;camera.y=h/2;camera.s=1;cameraControls.setDefaultScale(1)}
+ }
+ const frontierX=w*.94,frontierY=(h-68)*.84;
+ const translateX=frontierX+drift-a*ratio*focusX-c*focusY,translateY=frontierY-b*ratio*focusX-d*focusY;
+ cv.style.transform=`matrix(${a*ratio*camera.s},${b*ratio*camera.s},${c*camera.s},${d*camera.s},${w/2+(translateX-camera.x)*camera.s},${h/2+(translateY-camera.y)*camera.s})`;
 }
 function overlay(now){
  ox.clearRect(0,0,w,h);ox.fillStyle=vignette;ox.fillRect(0,0,w,h);ox.font='10px monospace';ox.fillStyle='#598195';ox.textAlign='right';
@@ -103,7 +122,7 @@ const x=Number(raw);if(!(x>0))return;const at=t||Date.now(),la=Math.log10(x)-30;
 if(subtype==='send')ev.push(at,la);
 markers.push({at,la,subtype,hash:String(hash||''),account,source,peakAt});last={x:x/1e30,hash:String(hash||'')};
 if(markers.length>3000)markers.splice(0,1000);
-if(!silent)soundFX.play({frequency:196*2**(Math.max(0,Math.min(1,(la+8)/13))*3),volume:.095,account,lfoDepth:.24});
+if(!silent)soundFX.play({frequency:196*2**(Math.max(0,Math.min(1,(la+8)/13))*3),volume:.095,account,lfoDepth:.24,amount:x/1e30,subtype,at,hash});
 }
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
 function stop(){simulation=null;if(feedClient){feedClient.stop();feedClient=null}}
@@ -151,7 +170,7 @@ $('mx').textContent='confirmed block activity'}
 $('hm').onchange=e=>{mode=e.target.value;build(Date.now())};
 gallerySettings.onNodeChange(connect);
 gallerySettings.onMemoryChange(()=>{T=gallerySettings.memoryMs;});
-addEventListener('pointermove',e=>{tx=e.clientX/innerWidth-.5});
+addEventListener('pointermove',e=>{if(!cameraControls.isGesture())tx=e.clientX/innerWidth-.5});
 addEventListener('resize',size);
 setInterval(()=>{hud(Date.now());overlay(Date.now())},500);
 size();connect();

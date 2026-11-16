@@ -13,7 +13,7 @@ const pages = [
   'hangtime.html',
   'score.html',
   'lattice.html',
-  'send-mountains.html'
+  'netloom.html'
 ];
 
 await rm(output, { recursive: true, force: true });

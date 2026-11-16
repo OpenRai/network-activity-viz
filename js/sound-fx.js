@@ -5,6 +5,8 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
   const wasmBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 125, 1, 125, 3, 2, 1, 0, 7, 10, 1, 6, 115, 97, 109, 112, 108, 101, 0, 0, 10, 52, 1, 50, 1, 1, 125, 67, 0, 0, 128, 63, 67, 0, 0, 128, 64, 32, 0, 67, 0, 0, 0, 63, 147, 139, 148, 147, 33, 1, 67, 0, 0, 192, 63, 32, 1, 148, 67, 0, 0, 0, 63, 32, 1, 32, 1, 32, 1, 148, 148, 148, 147, 11]);
   let context = null, oscillator = null, enabled = false;
   const voices = new Set();
+  const scheduledVoices = new Set();
+  let impulseContext=null, impulseBuffer=null;
   const sets = {
     air: {duration:1.2, decay:4, attack:.08},
     aurora: {duration:1.8, decay:3, attack:.16},
@@ -13,6 +15,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     choir: {duration:2.8, decay:1.7, attack:.65},
     velvet: {duration:1.8, decay:3, attack:.18},
     orbit: {duration:2, decay:2.8, attack:.14}
+    ,circuitWeave:{duration:1.05,decay:4.8,attack:.012}
+    ,signalLoom:{duration:1.7,decay:2.7,attack:.08}
+    ,neonPulse:{duration:.72,decay:5.2,attack:.006}
   };
   const alienSets = {
     air: {mod:39,index:3.4,ratio:.997,am:4.1}, aurora:{mod:53,index:5.2,ratio:1.006,am:5.3},
@@ -20,9 +25,12 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     choir:{mod:27,index:4.5,ratio:.989,am:2.8}, velvet:{mod:72,index:3.1,ratio:1.004,am:7.2},
     orbit:{mod:46,index:7.2,ratio:.996,am:4.8}
   };
-  let selected = 'air';
+  let selected = 'air', backend = profile === 'cyber' ? 'zzfx' : 'legacy';
   let pending = null, queued = null, disposed = false;
+  let masterLimiter = null, masterShaper = null;
+  let isHidden = typeof document !== 'undefined' ? document.hidden : false;
   function clearVoices() {
+    for(const timer of scheduledVoices)clearTimeout(timer);scheduledVoices.clear();
     for (const voice of [...voices]) {
       try { voice.stop(); } catch {}
       voice.onended?.();
@@ -35,6 +43,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     clearVoices();
     const old = context;
     context = null;
+    impulseContext = null; impulseBuffer = null; masterLimiter = null; masterShaper = null;
     if (old) {
       old.onstatechange = null;
       if (old.state !== 'closed') old.close().catch(() => {});
@@ -49,26 +58,27 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       try { context = new AudioContextClass(); }
       catch (error) { return Promise.reject(error); }
       context.onstatechange = () => {
-        if (enabled && context?.state !== 'running') {
-          clearVoices();
-          onStatus('Audio paused · click the sound control to retry.');
+        if (enabled && context?.state === 'running') {
+          onStatus('Sound enabled · pitch follows amount.');
+        } else if (enabled && ['suspended', 'interrupted'].includes(context?.state)) {
+          recover();
         }
       };
     }
     oscillator ||= new WebAssembly.Instance(new WebAssembly.Module(wasmBytes)).exports;
     const target = context;
     if (target.state === 'running') return Promise.resolve();
-    clearVoices();
-    // One bounded resume attempt, including when the browser never settles resume().
+
     let cancel, timer;
     const cancelled = new Promise((_, reject) => { cancel = () => reject(new Error('Audio recovery cancelled.')); });
     const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error('Audio recovery timed out.')), 4000);
+      timer = setTimeout(() => reject(new Error('Audio recovery timed out.')), 3000);
     });
     let resumed;
     try {
-      resumed = target.resume(); // Called synchronously from the user's gesture.
+      resumed = target.resume();
     } catch (error) { resumed = Promise.reject(error); }
+
     const operation = {cancel, promise:null};
     pending = operation;
     operation.promise = Promise.race([resumed, cancelled, timeout]).then(() => {
@@ -77,27 +87,38 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       onStatus('Sound enabled · pitch follows amount.');
       const cue = queued;
       queued = null;
-      if (cue && Date.now() - cue.at < 1500) play(cue.options);
+      if (cue && Date.now() - cue.at < 2000) play(cue.options);
     }).catch(error => {
-      if (context === target) {
+      // Do NOT destroy the AudioContext on background timeout; keep it alive to resume on return
+      if (!document.hidden && context === target && context.state === 'closed') {
         release();
-        onStatus('Audio paused · turn sound off and on to retry.');
       }
-      throw error;
     }).finally(() => {
       clearTimeout(timer);
       if (pending === operation) pending = null;
     });
     return operation.promise;
   }
-  function recover() { if (enabled && !disposed) ready().catch(() => {}); }
-  function visibility() { if (!document.hidden) recover(); }
-  function suspendPage() { release(); }
+  function recover() {
+    if (enabled && !disposed) {
+      if (context && (context.state === 'suspended' || context.state === 'interrupted')) {
+        context.resume().catch(() => {});
+      } else {
+        ready().catch(() => {});
+      }
+    }
+  }
+  function visibility() {
+    isHidden = document.hidden;
+    if (!isHidden && enabled) recover();
+  }
   const listeners = [
-    [window, 'pointerdown', recover], [window, 'keydown', recover],
-    [window, 'pageshow', recover], [window, 'focus', recover],
-    [window, 'pagehide', suspendPage], [document, 'freeze', suspendPage],
-    [document, 'resume', recover], [document, 'visibilitychange', visibility]
+    [window, 'pointerdown', recover],
+    [window, 'touchstart', recover],
+    [window, 'keydown', recover],
+    [window, 'focus', recover],
+    [window, 'pageshow', recover],
+    [document, 'visibilitychange', visibility]
   ];
   for (const [target, type, listener] of listeners) target.addEventListener(type, listener);
   function setSoundSet(name) {
@@ -117,15 +138,19 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     disposed = true;
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
   }
-  function play({frequency = 440, volume = 0.15, duration, outside = false, account = '', lfoDepth = profile === 'alien' ? .24 : .12} = {}) {
-    if (!enabled) return false;
+  function play({frequency = 440, volume = 0.15, duration, outside = false, account = '', amount = 0.001, subtype = 'send', at = Date.now(), hash = '', lfoDepth = profile === 'alien' ? .24 : .12} = {}) {
+    if (!enabled || disposed) return false;
     if (context?.state !== 'running') {
-      queued ||= {at:Date.now(), options:arguments[0]};
+      queued = {options: {frequency, volume, duration, outside, account, amount, subtype, at, hash, lfoDepth}, at: Date.now()};
       recover();
       return false;
     }
-    if (voices.size >= 12) return false;
+    if (voices.size >= (profile === 'cyber' && backend === 'zzfx' ? 28 : 12)) return false;
     const preset = sets[selected];
+    const magnitude = Math.max(0, Math.min(1, (Math.log10(Math.max(1e-30, amount)) + 5) / 10));
+    const eventTone = subtype === 'send' ? 1 : subtype === 'open' ? 1.12 : .92;
+    let eventSeed = 2166136261;
+    for (const char of account + hash) eventSeed = Math.imul(eventSeed ^ char.charCodeAt(0), 16777619) >>> 0;
     // Amount still chooses the register; a pentatonic lattice keeps unrelated
     // events harmonious. A little per-event drift avoids perfect tuning.
     const semitone = 12 * Math.log2(frequency / 196);
@@ -152,6 +177,209 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     frequency = 196 * 2 ** ((nearest + accountRoot) / 12) * (1 + (Math.random() * 2 - 1) * .02);
     duration ??= preset.duration;
     if (outside) duration = Math.max(.12, Math.min(3, duration));
+    if (profile === 'cyber' && backend === 'zzfx') {
+      const buildSamplesFn = globalThis.zzfxBuildSamples || (globalThis.ZZFX && globalThis.ZZFX.buildSamples);
+      if (!buildSamplesFn) { onStatus('ZzFX could not load. Reload the page to retry.'); return false; }
+      if (globalThis.ZZFX) globalThis.ZZFX.sampleRate = context.sampleRate;
+      const T = Object.assign({
+        // ── preset base volumes ──────────────────────────────────
+        vol_circuitWeave: 1.2, vol_signalLoom: 1.2, vol_neonPulse: 1.3,
+        // ── ADSR envelope (overrides if set) ─────────────────────
+        adsr_attack: null, adsr_decay: null,
+        adsr_sustain: null, adsr_sustainVol: null, adsr_release: null,
+        // ── filter ───────────────────────────────────────────────
+        filterType: selected === 'circuitWeave' ? 'bandpass' : 'lowpass',
+        filterCutoff: selected === 'circuitWeave' ? 1650 : 450,
+        filterQ: selected === 'circuitWeave' ? .2 : 1.2,
+        // ── layer synthesis ──────────────────────────────────────
+        layerVolBase: 1.0, layerVolStep: .15, gainMul: 5.5,
+        // ── reverb (convolver) ──────────────────────────────────
+        reverbSec: 3.75, reverbDecayPow: .5, reverbEarlyBoost: .4, reverbEarlyRate: 1.25,
+        // ── delay / feedback ────────────────────────────────────
+        delayBase: .20, delayStep: .04,
+        feedbackBase: .22, feedbackMagScale: .02,
+        // ── wet / dry mix ────────────────────────────────────────
+        dryGain: .85, wetGain: .32,
+        // ── compressor ──────────────────────────────────────────
+        cmpThreshold: -8, cmpKnee: 12, cmpRatio: 3.0,
+        cmpAttack: .008, cmpRelease: .22,
+      }, globalThis.NETLOOM_TWEAKS || {});
+      frequency = Math.max(1, frequency * T.inputFrequencyMul);
+      volume = Math.max(0, volume * T.inputVolumeMul);
+      amount = Math.max(1e-30, amount * T.inputAmountMul);
+      const pitch = frequency * eventTone;
+      // Acoustically re-tuned presets: crisp attack "HO"/"PA", lower decay volume "-ooo-", raised singing sustain & release "-OT"/"-oaAo"
+      const presetDefs = {
+        circuitWeave:    { vol: T.vol_circuitWeave,    attack: .008, decay: .12, sustain: .36, sustainVol: .18, release: 2.2, shape: 1, mod: .005 },
+        signalLoom:      { vol: T.vol_signalLoom,      attack: .012, decay: .14, sustain: .45, sustainVol: .22, release: 2.6, shape: 0, mod: .008 },
+        neonPulse:       { vol: T.vol_neonPulse,       attack: .006, decay: .10, sustain: .38, sustainVol: .20, release: 2.4, shape: 2, mod: .004 }
+      }[selected] || { vol: 1.2, attack: .01, decay: .14, sustain: .42, sustainVol: .22, release: 2.8, shape: 0, mod: 0 };
+
+      const att = T.adsr_attack ?? presetDefs.attack;
+      const dec = T.adsr_decay ?? presetDefs.decay;
+      const sus = T.adsr_sustain ?? presetDefs.sustain;
+      const sVol = T.adsr_sustainVol ?? presetDefs.sustainVol;
+      const rel = T.adsr_release ?? presetDefs.release;
+
+      // ZZFX parameter array: clean musical parameters with NO toy pitch slides or stutter repeats
+      const z = [
+        presetDefs.vol, 0, pitch,
+        att, sus, rel,
+        presetDefs.shape, 1, 0, 0, 0, 0, 0, 0,
+        presetDefs.mod, 0, 0,
+        sVol, dec, 0, 0
+      ];
+
+      const patterns = {
+        circuitWeave: [-12, 0, 7, 12],
+        signalLoom: [-7, 0, 5, 12],
+        neonPulse: [0, 7, 12],
+      };
+      const layers = patterns[selected] || [0], owner = context;
+      const launchLayer = index => {
+        const degree = layers[index], layer = [...z], direction = subtype === 'receive' ? -1 : 1;
+        // Fundamental is loudest; higher harmonics support naturally without tinny squeaks
+        const layerVol = (index === 0 ? 1.0 : 0.65 / Math.sqrt(index)) * T.layerVolBase;
+        layer[0] = layerVol;
+        // Musical micro-drift per layer
+        layer[2] = pitch * 2 ** (degree * direction / 12) * (1 + (eventSeed % 11 - 5) * 0.0003);
+        layer[6] = selected === 'circuitWeave' ? (index % 2 ? 1 : 0) :
+                   selected === 'neonPulse' ? (index === 0 ? 2 : 1) :
+                   selected === 'signalLoom' ? (index % 2 ? 1 : 0) : 0;
+        layer[14] = z[14] * (0.8 + (index % 3) * 0.2);
+
+        // Synthesize samples directly into a clean buffer
+        const rawSamples = buildSamplesFn(...layer);
+        const buffer = context.createBuffer(1, rawSamples.length, context.sampleRate);
+        buffer.getChannelData(0).set(rawSamples);
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        const gain = context.createGain();
+        source.gainNode = gain;
+
+        const filter = context.createBiquadFilter(), dry = context.createGain();
+        const delay = context.createDelay(4), feedback = context.createGain(), wet = context.createGain();
+        const convolver = context.createConvolver(), compressor = context.createDynamicsCompressor();
+
+        // Resonant filter contour: "HO-oooOT" / "PA-wwwoaAo"
+        filter.type = T.filterType || 'lowpass';
+        filter.Q.value = T.filterQ;
+        const baseCutoff = T.filterCutoff || 450;
+        const now = context.currentTime;
+        const startCutoff = Math.min(16000, Math.max(300, baseCutoff * (2.4 + magnitude * 0.6)));
+        const valleyCutoff = Math.min(12000, Math.max(120, baseCutoff * (0.85 + magnitude * 0.15)));
+        const sustainCutoff = Math.min(14000, Math.max(160, baseCutoff * (1.10 + magnitude * 0.25)));
+        const releaseCutoff = Math.min(10000, Math.max(100, baseCutoff * 0.75));
+
+        filter.frequency.setValueAtTime(startCutoff, now);
+        filter.frequency.exponentialRampToValueAtTime(valleyCutoff, now + Math.max(0.01, att + dec));
+        filter.frequency.exponentialRampToValueAtTime(sustainCutoff, now + Math.max(0.02, att + dec + sus));
+        filter.frequency.exponentialRampToValueAtTime(releaseCutoff, now + att + dec + sus + Math.min(3.0, rel));
+
+        if (impulseContext !== context || globalThis._nlReverbDirty) {
+          globalThis._nlReverbDirty = false;
+          const sec = T.reverbSec, len = Math.floor(context.sampleRate * sec);
+          impulseBuffer = context.createBuffer(2, len, context.sampleRate);
+          for (let ch = 0; ch < 2; ch++) {
+            const d = impulseBuffer.getChannelData(ch);
+            for (let i = 0; i < len; i++) {
+              const t = i / len;
+              d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, T.reverbDecayPow) * (1 + T.reverbEarlyBoost * Math.exp(-t * T.reverbEarlyRate));
+            }
+          }
+          impulseContext = context;
+        }
+
+        convolver.buffer = impulseBuffer;
+        delay.delayTime.value = T.delayBase + (eventSeed % 7) * T.delayStep;
+        feedback.gain.value = T.feedbackBase + magnitude * T.feedbackMagScale;
+        dry.gain.value = T.dryGain;
+        wet.gain.value = T.wetGain;
+
+        compressor.threshold.value = T.cmpThreshold;
+        compressor.knee.value = T.cmpKnee;
+        compressor.ratio.value = T.cmpRatio;
+        compressor.attack.value = T.cmpAttack;
+        compressor.release.value = T.cmpRelease;
+
+        if (!masterLimiter || masterLimiter.context !== context) {
+          masterLimiter = context.createDynamicsCompressor();
+          masterLimiter.threshold.setValueAtTime(-1.0, context.currentTime);
+          masterLimiter.knee.setValueAtTime(4.0, context.currentTime);
+          masterLimiter.ratio.setValueAtTime(20.0, context.currentTime);
+          masterLimiter.attack.setValueAtTime(0.001, context.currentTime);
+          masterLimiter.release.setValueAtTime(0.12, context.currentTime);
+
+          // Soft-knee waveshaper prevents digital DAC clipping
+          masterShaper = context.createWaveShaper();
+          const n = 4096, curve = new Float32Array(n);
+          for (let i = 0; i < n; i++) {
+            const x = (i * 2) / n - 1;
+            curve[i] = Math.tanh(x * 1.2) / Math.tanh(1.2);
+          }
+          masterShaper.curve = curve;
+          masterShaper.oversample = '2x';
+
+          masterLimiter.connect(masterShaper);
+          masterShaper.connect(context.destination);
+        }
+
+        // Strict audio graph routing: signal ONLY flows through filter, delay/reverb, compressor, limiter & soft-shaper
+        source.connect(gain);
+        gain.connect(filter);
+        filter.connect(dry);
+        dry.connect(compressor);
+        filter.connect(delay);
+        delay.connect(feedback);
+        feedback.connect(delay);
+        delay.connect(convolver);
+        convolver.connect(wet);
+        wet.connect(compressor);
+        compressor.connect(masterLimiter);
+
+        const fade = selected === 'signalLoom' ? 1 - index * 0.12 : 1;
+        const layerNorm = 1 / Math.sqrt(layers.length);
+        const targetGain = (T.gainMul * 0.22) * Math.max(0.35, Math.min(1.5, volume / 0.10)) * fade * layerNorm;
+
+        // Zero-click 5ms linear onset ramp from absolute 0 eliminates clicks at start
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(Math.max(0.0001, targetGain), now + 0.005);
+        source.start(now);
+        voices.add(source);
+
+        // Allow full note release + reverb tail + delay feedback to ring out completely
+        const totalNoteDuration = att + dec + sus + rel;
+        const fullRingOut = totalNoteDuration + T.reverbSec + (T.feedbackBase > 0 ? 3.5 : 1.5);
+        const expiry = setTimeout(() => {
+          try { source.stop(); } catch {}
+          source.onended?.();
+        }, fullRingOut * 1000);
+
+        source.onended = () => {
+          clearTimeout(expiry);
+          voices.delete(source);
+          source.onended = null;
+          source.disconnect();
+          setTimeout(() => {
+            for (const node of [gain, filter, dry, delay, feedback, wet, convolver, compressor]) {
+              try { node.disconnect(); } catch {}
+            }
+          }, Math.max(1500, T.reverbSec * 1000 + 2000));
+          source.buffer = null;
+        };
+      };
+      for (let index = 0; index < layers.length; index++) {
+        const delay = selected === 'signalLoom' ? index * 0.19 : 0;
+        if (delay) {
+          const timer = setTimeout(() => {
+            scheduledVoices.delete(timer);
+            if (context === owner && enabled) launchLayer(index);
+          }, delay * 1000);
+          scheduledVoices.add(timer);
+        } else launchLayer(index);
+      }
+      return true;
+    }
     const rate = context.sampleRate, length = Math.ceil(rate * duration);
     const buffer = context.createBuffer(1, length, rate), samples = buffer.getChannelData(0);
     let phase = 0, swooshPhase = 0;
@@ -160,7 +388,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     const noiseLength = Math.max(.12, Math.min(3, noiseSeconds));
     for (let i = 0; i < length; i++) {
       const time = i / rate;
-      const pitch = selected === 'velvet' || selected === 'choir' ? frequency / 2 : frequency;
+      const pitch = (selected === 'velvet' || selected === 'choir' || selected === 'nodeChoir' ? frequency / 2 : frequency) * eventTone;
       const alien = profile === 'alien' ? alienSets[selected] : null;
       const lfo = 1 - Math.max(0, Math.min(.8, lfoDepth)) * (.5 - .5 * Math.cos(2 * Math.PI * (alien?.am || 4.5) * time));
       phase = (phase + pitch / rate) % 1;
@@ -209,6 +437,15 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
         }
         case 'velvet': wave = .4*sine(.998) + .18*sine(1.002) + .08*oscillator.sample(phase); break;
         case 'orbit': wave = (.4*sine(1) + .16*sine(1.004) + .07*sine(3))*(.85+.15*Math.cos(time*Math.PI*2*.7)); break;
+        case 'circuitWeave': wave = .34*sine(1) + (.12+.16*magnitude)*sine(2.01) + .14*sine(3.98+eventTone*.01) + .08*sine(7.02+(eventSeed%9)*.002); break;
+        case 'signalLoom': { const pulse=.5+.5*Math.sin(time*Math.PI*2*(2.2+magnitude*2.4)+(eventSeed%100)/100); wave=(.36*sine(1)+.2*sine(1.5)+.12*sine(2.5))*(.58+.42*pulse); break; }
+        case 'neonPulse': { const pulse=Math.exp(-time*(7+magnitude*7))*(1+.35*Math.sin(time*Math.PI*2*(13+magnitude*11))); wave=(.38*sine(1)+(.08+.12*magnitude)*sine(2.03))*pulse; break; }
+        case 'threadResonance': { const detune=.001+(magnitude*.003); wave=.34*sine(1-detune)+.31*sine(1+detune)+.13*sine(2.006)+.06*sine(3.01); break; }
+        case 'nodeChoir': {
+          wave=0;
+          for(let step=0;step<preset.steps.length;step++){const order=subtype==='receive'?preset.steps.length-1-step:step,age=time-step*(.18+magnitude*.1);if(age>=0)wave+=(.2+.1*magnitude)*Math.sin(age*pitch*2**(preset.steps[order]/12)*Math.PI*2)*Math.min(1,age/.08)*Math.exp(-age*2.8)}
+          break;
+        }
         default: wave = .45*sine(1) + .2*sine(1.005) + .15*sine(3);
       }
       if (outside) {
@@ -238,7 +475,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     }
     const source = context.createBufferSource(), gain = context.createGain();
     // Lift tonal cues across every preset without changing outside-receive swooshes.
-    const level = outside ? 1 : 2.5;
+    const level = outside ? 1 : 3;
     source.buffer = buffer; gain.gain.value = level * Math.max(0, Math.min(volume, 0.2)) / Math.sqrt(1 + voices.size);
     source.connect(gain); gain.connect(context.destination); voices.add(source);
     const owner = context, startedAt = owner.currentTime;
