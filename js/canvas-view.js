@@ -88,7 +88,7 @@ function mark(block, x, y, radius = 5, role = 'block', interactive = true, opaci
 }
 function empty(w,h,message){text(message,w/2,h/2,colors.muted,12,'center')}
 function containsHit(hit,x,y){return hit.left!==undefined?x>=hit.left&&x<=hit.right&&y>=hit.top&&y<=hit.bottom:Math.hypot(x-hit.x,y-hit.y)<hit.r}
-canvas.onclick=e=>{const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hits.slice().reverse().find(p=>containsHit(p,x,y));if(hit){if(hit.account)inspectAccount(hit.account);else inspect(hit.block)}};
+canvas.onclick=e=>{const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hits.slice().reverse().find(p=>containsHit(p,x,y));if(hit){if(hit.account)inspectAccount(hit.account);else inspect(hit.block)}else{state.selected=null;state.selectedAccount=null;render()}};
 canvas.onmousemove=e=>{if(document.body.dataset.theme==='eventsky'){canvas.style.cursor='default';return}const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;canvas.style.cursor=hits.some(p=>containsHit(p,x,y))?'pointer':'default'};
 function render(){
  const m=model();activeVotePulses=m.votePulses;updatePanels(m);const {w,h}=setup();

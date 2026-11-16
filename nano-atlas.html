@@ -84,8 +84,10 @@
         for(const account of [transfer.send.account,transfer.send.destination]){const value=depthByAccount.get(account)||{sum:0,count:0};value.sum+=depth;value.count++;depthByAccount.set(account,value)}
       }
       const accountDepth=account=>{const value=depthByAccount.get(account);return value?value.sum/value.count:0};
-      const theta=reducedMotion?0:state.time*.000025+Math.sin(state.time*.00018)*.08,cos=Math.cos(theta),sin=Math.sin(theta);
-      function project(x,y,z=0){const dx=x-.5,rx=dx*cos-z*sin,rz=dx*sin+z*cos,perspective=1/(1-rz*.12);return{x:cx+rx*plotWidth*.97*perspective,y:cy+(y-.5)*plotHeight*.95*perspective-rz*plotHeight*.12,depth:rz}}
+      // A slow, bounded sway keeps the network facing the observer.
+      const theta=reducedMotion?0:Math.sin(state.time*.000025)*.06,cos=Math.cos(theta),sin=Math.sin(theta);
+      function project(x,y,z=0){const dx=x-.5,rx=dx*cos-z*sin,rz=dx*sin+z*cos,perspective=1/(1-rz*.18);return{x:cx+rx*plotWidth*.97*perspective,y:cy+(y-.5)*plotHeight*.95*perspective-rz*plotHeight*.035,depth:rz}}
+      const depthLight=depth=>Math.max(.82,Math.min(1,.91+depth*.25));
       const projected=new Map(accounts.map(account=>{const p=points.get(account);return[account,project(p.x,p.y,accountDepth(account))]}));
       const transfers=allTransfers.slice(-150);
       for(let i=0;i<accounts.length;i++)for(let j=i+1;j<accounts.length;j++){
@@ -110,14 +112,15 @@
       ctx.restore();
       for(const t of transfers){
         const a=projected.get(t.send.account),b=projected.get(t.send.destination),ax=a.x,ay=a.y,bx=b.x,by=b.y,received=!!t.receive,color=received?colors.receive:colors.send;
-        ctx.save();ctx.strokeStyle=color;ctx.globalAlpha=received?.34:.2;ctx.lineWidth=.8+Math.min(3,Math.max(0,(logAmount(t.send.raw)+4)/8));ctx.setLineDash(received?[]:[3,7]);ctx.beginPath();ctx.moveTo(ax,ay);ctx.quadraticCurveTo(cx,cy,bx,by);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+        ctx.save();ctx.strokeStyle=color;ctx.globalAlpha=(received?.34:.2)*depthLight((a.depth+b.depth)/2);ctx.lineWidth=.8+Math.min(3,Math.max(0,(logAmount(t.send.raw)+4)/8));ctx.setLineDash(received?[]:[3,7]);ctx.beginPath();ctx.moveTo(ax,ay);ctx.quadraticCurveTo(cx,cy,bx,by);ctx.stroke();ctx.setLineDash([]);ctx.restore();
         const px=(ax+2*cx+bx)/4,py=(ay+2*cy+by)/4;hits.push({x:px,y:py,r:14,block:t.send});
         if(received&&!reducedMotion){const age=state.time-t.receive.at;if(age>=0&&age<1100){const p=age/1100,q=1-p;dot(q*q*ax+2*q*p*cx+p*p*bx,q*q*ay+2*q*p*cy+p*p*by,3.2,color,true)}}
       }
       const blocksByAccount=new Map();
       for(const b of m.blocks)if(accountSet.has(b.account)){const list=blocksByAccount.get(b.account)||[];list.push(b);blocksByAccount.set(b.account,list)}
       for(const account of [...accounts].sort((a,b)=>projected.get(a).depth-projected.get(b).depth)){
-        const p=points.get(account),position=projected.get(account),x=position.x,y=position.y,dx=x-cx,dy=y-cy,len=Math.hypot(dx,dy)||1,rx=dx/len,ry=dy/len,tx=-ry,ty=rx,depth=accountDepth(account),nodeScale=1+depth*.35;
+        const p=points.get(account),position=projected.get(account),x=position.x,y=position.y,dx=x-cx,dy=y-cy,len=Math.hypot(dx,dy)||1,rx=dx/len,ry=dy/len,tx=-ry,ty=rx,depth=position.depth,nodeScale=1+depth*.12;
+        ctx.save();ctx.globalAlpha*=depthLight(depth);
         const chain=(blocksByAccount.get(account)||[]).sort((a,b)=>a.at-b.at).slice(-8);
         for(let i=0;i<chain.length;i++){
           const offset=20+(chain.length-1-i)*8,side=(i-(chain.length-1)/2)*2.5,bx=x+rx*offset+tx*side,by=y+ry*offset+ty*side;
@@ -127,6 +130,7 @@
         const latest=chain.at(-1);dot(x,y,6*nodeScale,colors.bg);dot(x,y,3.2*nodeScale,latest&&latest.subtype==='send'?colors.send:colors.receive,true);
         const label=short(account),labelX=x+rx*13,labelY=y+ry*13,align=rx<-.25?'right':'left',labelWidth=label.length*6;
         text(label,labelX,labelY,colors.ink,10,align);
+        ctx.restore();
         hits.push({left:align==='right'?labelX-labelWidth:labelX,right:align==='right'?labelX:labelX+labelWidth,top:labelY-10,bottom:labelY+4,account});
       }
       if(!accounts.length)empty(w,h,'Waiting for confirmed account activity');
