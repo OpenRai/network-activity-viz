@@ -18,6 +18,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     ,circuitWeave:{duration:1.05,decay:4.8,attack:.012}
     ,signalLoom:{duration:1.7,decay:2.7,attack:.08}
     ,neonPulse:{duration:.72,decay:5.2,attack:.006}
+    ,handsetSolace:{duration:3.5,decay:1.8,attack:.12}
   };
   const alienSets = {
     air: {mod:39,index:3.4,ratio:.997,am:4.1}, aurora:{mod:53,index:5.2,ratio:1.006,am:5.3},
@@ -25,9 +26,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     choir:{mod:27,index:4.5,ratio:.989,am:2.8}, velvet:{mod:72,index:3.1,ratio:1.004,am:7.2},
     orbit:{mod:46,index:7.2,ratio:.996,am:4.8}
   };
-  let selected = 'air', backend = profile === 'cyber' ? 'zzfx' : 'legacy';
+  let selected = 'air', backend = profile === 'cyber' ? 'zzfx' : 'legacy', volumeMultiplier = 1;
   let pending = null, queued = null, disposed = false;
-  let masterLimiter = null, masterShaper = null;
+  let masterGain = null, masterLimiter = null, masterShaper = null;
   let isHidden = typeof document !== 'undefined' ? document.hidden : false;
   function clearVoices() {
     for(const timer of scheduledVoices)clearTimeout(timer);scheduledVoices.clear();
@@ -43,7 +44,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     clearVoices();
     const old = context;
     context = null;
-    impulseContext = null; impulseBuffer = null; masterLimiter = null; masterShaper = null;
+    impulseContext = null; impulseBuffer = null; masterGain = null; masterLimiter = null; masterShaper = null;
     if (old) {
       old.onstatechange = null;
       if (old.state !== 'closed') old.close().catch(() => {});
@@ -57,6 +58,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     if (!context || context.state === 'closed') {
       try { context = new AudioContextClass(); }
       catch (error) { return Promise.reject(error); }
+      masterGain = context.createGain();
+      masterGain.gain.value = volumeMultiplier;
+      masterGain.connect(context.destination);
       context.onstatechange = () => {
         if (enabled && context?.state === 'running') {
           onStatus('Sound enabled · pitch follows amount.');
@@ -138,6 +142,10 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     disposed = true;
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
   }
+  function setVolumeMultiplier(value) {
+    volumeMultiplier = Math.max(.5, Math.min(1.5, Number(value) || 1));
+    if (context && masterGain) masterGain.gain.setTargetAtTime(volumeMultiplier, context.currentTime, .015);
+  }
   function play({frequency = 440, volume = 0.15, duration, outside = false, account = '', amount = 0.001, subtype = 'send', at = Date.now(), hash = '', lfoDepth = profile === 'alien' ? .24 : .12} = {}) {
     if (!enabled || disposed) return false;
     if (context?.state !== 'running') {
@@ -212,7 +220,8 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       const presetDefs = {
         circuitWeave:    { vol: T.vol_circuitWeave,    attack: .008, decay: .12, sustain: .36, sustainVol: .18, release: 2.2, shape: 1, mod: .005 },
         signalLoom:      { vol: T.vol_signalLoom,      attack: .012, decay: .14, sustain: .45, sustainVol: .22, release: 2.6, shape: 0, mod: .008 },
-        neonPulse:       { vol: T.vol_neonPulse,       attack: .006, decay: .10, sustain: .38, sustainVol: .20, release: 2.4, shape: 2, mod: .004 }
+        neonPulse:       { vol: T.vol_neonPulse,       attack: .006, decay: .10, sustain: .38, sustainVol: .20, release: 2.4, shape: 2, mod: .004 },
+        handsetSolace:         { vol: 5, attack: 0, decay: .4, sustain: .07, sustainVol: .51, release: .008, shape: 0, mod: 0 }
       }[selected] || { vol: 1.2, attack: .01, decay: .14, sustain: .42, sustainVol: .22, release: 2.8, shape: 0, mod: 0 };
 
       const att = T.adsr_attack ?? presetDefs.attack;
@@ -222,31 +231,37 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       const rel = T.adsr_release ?? presetDefs.release;
 
       // ZZFX parameter array: clean musical parameters with NO toy pitch slides or stutter repeats
-      const z = [
-        presetDefs.vol, 0, pitch,
-        att, sus, rel,
-        presetDefs.shape, 1, 0, 0, 0, 0, 0, 0,
-        presetDefs.mod, 0, 0,
-        sVol, dec, 0, 0
-      ];
+      const z = selected === 'handsetSolace'
+        ? [5,.05,pitch,0,.07,.008,0,3.1,0,0,0,0,0,.1,0,0,0,.51,.4,0,769]
+        : [
+          presetDefs.vol, 0, pitch,
+          att, sus, rel,
+          presetDefs.shape, 1, 0, 0, 0, 0, 0, 0,
+          presetDefs.mod, 0, 0,
+          sVol, dec, 0, 0
+        ];
 
       const patterns = {
         circuitWeave: [-12, 0, 7, 12],
         signalLoom: [-7, 0, 5, 12],
         neonPulse: [0, 7, 12],
+        handsetSolace: [0],
       };
-      const layers = patterns[selected] || [0], owner = context;
+      const allLayers = patterns[selected] || [0];
+      const layers = allLayers;
+      const filterMagnitude = selected === 'handsetSolace' ? 0.5 : magnitude;
+      const owner = context;
       const launchLayer = index => {
         const degree = layers[index], layer = [...z], direction = subtype === 'receive' ? -1 : 1;
         // Fundamental is loudest; higher harmonics support naturally without tinny squeaks
         const layerVol = (index === 0 ? 1.0 : 0.65 / Math.sqrt(index)) * T.layerVolBase;
-        layer[0] = layerVol;
+        if (selected !== 'handsetSolace') layer[0] = layerVol;
         // Musical micro-drift per layer
-        layer[2] = pitch * 2 ** (degree * direction / 12) * (1 + (eventSeed % 11 - 5) * 0.0003);
+        layer[2] = pitch * 2 ** (degree * direction / 12) * (selected === 'handsetSolace' ? 1 : 1 + (eventSeed % 11 - 5) * 0.0003);
         layer[6] = selected === 'circuitWeave' ? (index % 2 ? 1 : 0) :
                    selected === 'neonPulse' ? (index === 0 ? 2 : 1) :
                    selected === 'signalLoom' ? (index % 2 ? 1 : 0) : 0;
-        layer[14] = z[14] * (0.8 + (index % 3) * 0.2);
+        if (selected !== 'handsetSolace') layer[14] = z[14] * (0.8 + (index % 3) * 0.2);
 
         // Synthesize samples directly into a clean buffer
         const rawSamples = buildSamplesFn(...layer);
@@ -266,15 +281,19 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
         filter.Q.value = T.filterQ;
         const baseCutoff = T.filterCutoff || 450;
         const now = context.currentTime;
-        const startCutoff = Math.min(16000, Math.max(300, baseCutoff * (2.4 + magnitude * 0.6)));
-        const valleyCutoff = Math.min(12000, Math.max(120, baseCutoff * (0.85 + magnitude * 0.15)));
-        const sustainCutoff = Math.min(14000, Math.max(160, baseCutoff * (1.10 + magnitude * 0.25)));
+        const startCutoff = Math.min(16000, Math.max(300, baseCutoff * (2.4 + filterMagnitude * 0.6)));
+        const valleyCutoff = Math.min(12000, Math.max(120, baseCutoff * (0.85 + filterMagnitude * 0.15)));
+        const sustainCutoff = Math.min(14000, Math.max(160, baseCutoff * (1.10 + filterMagnitude * 0.25)));
         const releaseCutoff = Math.min(10000, Math.max(100, baseCutoff * 0.75));
 
-        filter.frequency.setValueAtTime(startCutoff, now);
-        filter.frequency.exponentialRampToValueAtTime(valleyCutoff, now + Math.max(0.01, att + dec));
-        filter.frequency.exponentialRampToValueAtTime(sustainCutoff, now + Math.max(0.02, att + dec + sus));
-        filter.frequency.exponentialRampToValueAtTime(releaseCutoff, now + att + dec + sus + Math.min(3.0, rel));
+        if (selected === 'handsetSolace') {
+          filter.frequency.setValueAtTime(baseCutoff, now);
+        } else {
+          filter.frequency.setValueAtTime(startCutoff, now);
+          filter.frequency.exponentialRampToValueAtTime(valleyCutoff, now + Math.max(0.01, att + dec));
+          filter.frequency.exponentialRampToValueAtTime(sustainCutoff, now + Math.max(0.02, att + dec + sus));
+          filter.frequency.exponentialRampToValueAtTime(releaseCutoff, now + att + dec + sus + Math.min(3.0, rel));
+        }
 
         if (impulseContext !== context || globalThis._nlReverbDirty) {
           globalThis._nlReverbDirty = false;
@@ -292,7 +311,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
 
         convolver.buffer = impulseBuffer;
         delay.delayTime.value = T.delayBase + (eventSeed % 7) * T.delayStep;
-        feedback.gain.value = T.feedbackBase + magnitude * T.feedbackMagScale;
+        feedback.gain.value = T.feedbackBase + filterMagnitude * T.feedbackMagScale;
         dry.gain.value = T.dryGain;
         wet.gain.value = T.wetGain;
 
@@ -321,7 +340,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
           masterShaper.oversample = '2x';
 
           masterLimiter.connect(masterShaper);
-          masterShaper.connect(context.destination);
+          masterShaper.connect(masterGain);
         }
 
         // Strict audio graph routing: signal ONLY flows through filter, delay/reverb, compressor, limiter & soft-shaper
@@ -477,7 +496,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     // Lift tonal cues across every preset without changing outside-receive swooshes.
     const level = outside ? 1 : 3;
     source.buffer = buffer; gain.gain.value = level * Math.max(0, Math.min(volume, 0.2)) / Math.sqrt(1 + voices.size);
-    source.connect(gain); gain.connect(context.destination); voices.add(source);
+    source.connect(gain); gain.connect(masterGain); voices.add(source);
     const owner = context, startedAt = owner.currentTime;
     // A frozen audio clock may never deliver ended, even while state says running.
     const expiry = setTimeout(() => {
@@ -496,5 +515,5 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     source.start();
     return true;
   }
-  return {enable, disable: stop, play, setSoundSet, dispose};
+  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose};
 }

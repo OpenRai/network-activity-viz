@@ -77,11 +77,11 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <details id="hud">
 <summary><h1>Block Threads</h1></summary>
 <label class="r sound-toggle" for="snd"><input id="snd" type="checkbox" aria-describedby="audioState"><span class="sound-symbol" aria-hidden="true">♫</span><span>Sound</span></label>
-<label class="r">Sound set <select id="soundSet"><option value="circuitWeave">Circuit Weave</option><option value="signalLoom">Signal Loom</option><option value="neonPulse" selected>Neon Pulse</option></select></label>
+<label class="r">Volume <input id="soundVolume" type="range" min="50" max="150" step="1" value="100"><span id="soundVolumeValue">100%</span></label>
+<label class="r">Sound set <select id="soundSet"><option value="circuitWeave">Circuit Weave</option><option value="signalLoom">Signal Resonance</option><option value="neonPulse" selected>Neon Pulse</option><option value="handsetSolace">Handset Solace</option></select></label>
 <div id="audioState" class="n" role="status"></div>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
 <div class="controls"><label>Node <select id="feed"></select></label></div>
-<label class="r">Height scale <select id="hm"><option>sqrt</option><option>linear</option><option>log</option></select></label>
 <div id="stats"></div>
 <canvas id="lg" width="256" height="8"></canvas>
 <div class="r n"><span>0</span><span id="mx"></span></div>

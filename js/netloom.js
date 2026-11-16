@@ -5,6 +5,10 @@ const cv=$('c'),cx=cv.getContext('2d'),ov=$('o'),ox=ov.getContext('2d');
 let T=gallerySettings.memoryMs,Te=6e4,t0=Date.now(),cnt={},lastMsg=0,mode='sqrt',ev=[],markers=[],feedClient=null,last=null,dpr=1,tx=0,simulation=null;
 const soundFX=createSoundFX({profile:'cyber',onStatus:message=>{$('audioState').textContent=message}}),soundSet=$('soundSet');
 globalThis.netloomSoundFX=soundFX;
+const soundVolume=$('soundVolume'),soundVolumeValue=$('soundVolumeValue');
+try{const saved=Number(localStorage.getItem('netloom-sound-volume'));if(saved>=50&&saved<=150)soundVolume.value=saved}catch{}
+soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);soundVolumeValue.textContent=soundVolume.value+'%';
+soundVolume.oninput=()=>{soundVolumeValue.textContent=soundVolume.value+'%';soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);try{localStorage.setItem('netloom-sound-volume',soundVolume.value)}catch{}};
 try{const saved=localStorage.getItem('netloom-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
 soundFX.setSoundSet(soundSet.value);
 soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('netloom-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
@@ -122,7 +126,7 @@ const x=Number(raw);if(!(x>0))return;const at=t||Date.now(),la=Math.log10(x)-30;
 if(subtype==='send')ev.push(at,la);
 markers.push({at,la,subtype,hash:String(hash||''),account,source,peakAt});last={x:x/1e30,hash:String(hash||'')};
 if(markers.length>3000)markers.splice(0,1000);
-if(!silent)soundFX.play({frequency:196*2**(Math.max(0,Math.min(1,(la+8)/13))*3),volume:.095,account,lfoDepth:.24,amount:x/1e30,subtype,at,hash});
+if(!silent){const amountPitch=Math.max(0,Math.min(1,(la+8)/13));const pitchPosition=soundSet.value==='neonPulse'?1-amountPitch:amountPitch;soundFX.play({frequency:196*2**(pitchPosition*3),volume:.095,account,lfoDepth:.24,amount:x/1e30,subtype,at,hash});}
 }
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
 function stop(){simulation=null;if(feedClient){feedClient.stop();feedClient=null}}
@@ -167,7 +171,6 @@ $('stats').textContent=`${n} sends in view, ${m1} in the last minute\nShowing ${
 (last?`\nLatest: ${fmt(last.x)} ${last.hash.slice(0,8)}`:'');
 $('mx').textContent='confirmed block activity'}
 
-$('hm').onchange=e=>{mode=e.target.value;build(Date.now())};
 gallerySettings.onNodeChange(connect);
 gallerySettings.onMemoryChange(()=>{T=gallerySettings.memoryMs;});
 addEventListener('pointermove',e=>{if(!cameraControls.isGesture())tx=e.clientX/innerWidth-.5});
