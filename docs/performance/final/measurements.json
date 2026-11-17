@@ -1,0 +1,2365 @@
+{
+  "polyphony-0": {
+    "durationMs": 20007.600000023842,
+    "conditions": {
+      "preset": "neonPulse",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&voicePolicy=0",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 563,
+      "soundRequested": 162,
+      "sampleCacheMiss": 46,
+      "samples": 46,
+      "effectsBusCreated": 1,
+      "voiceStarted": 168,
+      "eventVoiced": 65,
+      "sampleCacheHit": 122,
+      "layerRejected": 36,
+      "soundRejected": 94,
+      "voiceEnded": 140
+    },
+    "timings": {
+      "layout": {
+        "count": 191,
+        "total": 28.99999976158142,
+        "p50": 0.10000002384185791,
+        "p95": 0.2999999523162842,
+        "p99": 0.30000007152557373,
+        "max": 0.30000007152557373
+      },
+      "bandStepPixels": {
+        "count": 563,
+        "total": 403.0911682424996,
+        "p50": 0.24229540072360578,
+        "p95": 3.996066895437025,
+        "p99": 5.369372706488889,
+        "max": 8.09013026973787
+      },
+      "canvasBuild": {
+        "count": 563,
+        "total": 364.3999991416931,
+        "p50": 0.6000000238418579,
+        "p95": 1.100000023841858,
+        "p99": 1.2999999523162842,
+        "max": 2.700000047683716
+      },
+      "camera": {
+        "count": 594,
+        "total": 19.100001215934753,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.20000004768371582
+      },
+      "frameInterval": {
+        "count": 593,
+        "total": 19982.699999999997,
+        "p50": 33.30000000000109,
+        "p95": 34.29999999999927,
+        "p99": 50,
+        "max": 50.5
+      },
+      "workerSynthesis": {
+        "count": 46,
+        "total": 784.5999990701675,
+        "p50": 15.799999952316284,
+        "p95": 21.09999990463257,
+        "p99": 25.699999928474426,
+        "max": 25.699999928474426
+      },
+      "synthesisLatency": {
+        "count": 46,
+        "total": 1652.5000003576279,
+        "p50": 36.200000047683716,
+        "p95": 57.799999952316284,
+        "p99": 74.29999995231628,
+        "max": 74.29999995231628
+      }
+    },
+    "state": {
+      "markers": 162,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "audio": {
+        "rms": 0.08731413672049508,
+        "peak": 0.22812585532665253,
+        "state": "running",
+        "currentTime": 20.010666666666665,
+        "voices": 28,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": true,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 46,
+        "cacheBytes": 29746176
+      }
+    }
+  },
+  "polyphony-1": {
+    "durationMs": 20009.700000047684,
+    "conditions": {
+      "preset": "neonPulse",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&voicePolicy=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "soundRequested": 162,
+      "sampleCacheMiss": 27,
+      "canvasPaint": 507,
+      "samples": 27,
+      "effectsBusCreated": 1,
+      "voiceStarted": 177,
+      "eventVoiced": 162,
+      "sampleCacheHit": 150,
+      "harmonicsReduced": 156,
+      "voiceStolen": 91,
+      "voiceEnded": 149
+    },
+    "timings": {
+      "layout": {
+        "count": 184,
+        "total": 32.20000088214874,
+        "p50": 0.19999992847442627,
+        "p95": 0.30000007152557373,
+        "p99": 0.30000007152557373,
+        "max": 0.3999999761581421
+      },
+      "camera": {
+        "count": 582,
+        "total": 22.299999713897705,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 507,
+        "total": 598.7598077026687,
+        "p50": 0.26572156288287374,
+        "p95": 8.380529170268971,
+        "p99": 14.913550398082805,
+        "max": 26.35710361468007
+      },
+      "marksDrawn": {
+        "count": 507,
+        "total": 30367,
+        "p50": 63,
+        "p95": 117,
+        "p99": 122,
+        "max": 123
+      },
+      "labelsDrawn": {
+        "count": 507,
+        "total": 10445,
+        "p50": 25,
+        "p95": 32,
+        "p99": 33,
+        "max": 35
+      },
+      "canvasBuild": {
+        "count": 507,
+        "total": 379.1999990940094,
+        "p50": 0.7000000476837158,
+        "p95": 1.100000023841858,
+        "p99": 1.3000000715255737,
+        "max": 1.7000000476837158
+      },
+      "frameInterval": {
+        "count": 581,
+        "total": 19966.7,
+        "p50": 33.399999999999636,
+        "p95": 49.80000000000018,
+        "p99": 50.20000000000073,
+        "max": 51.80000000000018
+      },
+      "workerSynthesis": {
+        "count": 27,
+        "total": 796.7000000476837,
+        "p50": 26.09999990463257,
+        "p95": 43.10000002384186,
+        "p99": 43.5,
+        "max": 43.5
+      },
+      "synthesisLatency": {
+        "count": 27,
+        "total": 1281.9999998807907,
+        "p50": 43,
+        "p95": 83.70000004768372,
+        "p99": 85.5,
+        "max": 85.5
+      }
+    },
+    "state": {
+      "markers": 162,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "audio": {
+        "rms": 0.2486364698313174,
+        "peak": 0.46481937170028687,
+        "state": "running",
+        "currentTime": 20.016,
+        "voices": 28,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 27,
+        "cacheBytes": 17459712
+      }
+    }
+  },
+  "clock-before": {
+    "durationMs": 20009.199999928474,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&audioClock=0&cullScene=0",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 488,
+      "soundRequested": 69,
+      "sampleCacheMiss": 45,
+      "samples": 41,
+      "effectsBusCreated": 1,
+      "voiceStarted": 131,
+      "eventVoiced": 69,
+      "synthesisCoalesced": 4,
+      "harmonicsReduced": 58,
+      "sampleCacheHit": 86,
+      "voiceEnded": 108,
+      "voiceStolen": 4
+    },
+    "timings": {
+      "layout": {
+        "count": 177,
+        "total": 23.69999921321869,
+        "p50": 0.10000002384185791,
+        "p95": 0.20000004768371582,
+        "p99": 0.30000007152557373,
+        "max": 0.3999999761581421
+      },
+      "camera": {
+        "count": 556,
+        "total": 16.00000035762787,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.19999992847442627
+      },
+      "bandStepPixels": {
+        "count": 488,
+        "total": 390.69401476476276,
+        "p50": 0.39671925030933153,
+        "p95": 3.2469283763900876,
+        "p99": 4.968681405408006,
+        "max": 10.119805905053227
+      },
+      "marksDrawn": {
+        "count": 488,
+        "total": 16517,
+        "p50": 34,
+        "p95": 66,
+        "p99": 67,
+        "max": 69
+      },
+      "labelsDrawn": {
+        "count": 488,
+        "total": 14283,
+        "p50": 33,
+        "p95": 57,
+        "p99": 58,
+        "max": 58
+      },
+      "canvasBuild": {
+        "count": 488,
+        "total": 279.4999998807907,
+        "p50": 0.6000000238418579,
+        "p95": 0.8999999761581421,
+        "p99": 1.0999999046325684,
+        "max": 1.600000023841858
+      },
+      "frameInterval": {
+        "count": 555,
+        "total": 20001.6,
+        "p50": 33.30000000000109,
+        "p95": 49.30000000000109,
+        "p99": 50.600000000000364,
+        "max": 1000.3
+      },
+      "workerSynthesis": {
+        "count": 41,
+        "total": 1289.6000002622604,
+        "p50": 34.39999997615814,
+        "p95": 38.90000009536743,
+        "p99": 47,
+        "max": 47
+      },
+      "synthesisLatency": {
+        "count": 45,
+        "total": 1375.7000004053116,
+        "p50": 34.10000002384186,
+        "p95": 43.10000002384186,
+        "p99": 60.299999952316284,
+        "max": 60.299999952316284
+      },
+      "arpeggioLatenessMs": {
+        "count": 131,
+        "total": 2178.3333333333103,
+        "p50": 6.999999999998785,
+        "p95": 46.333333333333115,
+        "p99": 58.33333333333335,
+        "max": 63.66666666666668
+      }
+    },
+    "state": {
+      "markers": 69,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "audio": {
+        "rms": 0.25469101891467366,
+        "peak": 0.4651884138584137,
+        "state": "running",
+        "currentTime": 20.013333333333332,
+        "voices": 23,
+        "scheduled": 2,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": true,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 41,
+        "cacheBytes": 26512896
+      }
+    }
+  },
+  "clock-after": {
+    "durationMs": 20010.199999928474,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&audioClock=1&cullScene=0",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 513,
+      "soundRequested": 69,
+      "sampleCacheMiss": 40,
+      "samples": 40,
+      "effectsBusCreated": 1,
+      "voiceStarted": 129,
+      "eventVoiced": 69,
+      "sampleCacheHit": 89,
+      "harmonicsReduced": 61,
+      "voiceEnded": 104
+    },
+    "timings": {
+      "layout": {
+        "count": 183,
+        "total": 19.499999403953552,
+        "p50": 0.10000002384185791,
+        "p95": 0.20000004768371582,
+        "p99": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "camera": {
+        "count": 582,
+        "total": 19.000000596046448,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 513,
+        "total": 567.3939641413281,
+        "p50": 0.3982399956267386,
+        "p95": 5.1531779844260654,
+        "p99": 8.096408583587277,
+        "max": 13.039830623603393
+      },
+      "marksDrawn": {
+        "count": 513,
+        "total": 16993,
+        "p50": 34,
+        "p95": 66,
+        "p99": 67,
+        "max": 69
+      },
+      "labelsDrawn": {
+        "count": 513,
+        "total": 14724,
+        "p50": 33,
+        "p95": 57,
+        "p99": 58,
+        "max": 58
+      },
+      "canvasBuild": {
+        "count": 513,
+        "total": 283.29999911785126,
+        "p50": 0.5,
+        "p95": 0.8000000715255737,
+        "p99": 0.9000000953674316,
+        "max": 1.6999999284744263
+      },
+      "frameInterval": {
+        "count": 581,
+        "total": 19966.2,
+        "p50": 33.30000000000109,
+        "p95": 49.599999999998545,
+        "p99": 50.29999999999927,
+        "max": 51.70000000000073
+      },
+      "workerSynthesis": {
+        "count": 40,
+        "total": 1039.599999666214,
+        "p50": 23.5,
+        "p95": 39,
+        "p99": 40.699999928474426,
+        "max": 40.699999928474426
+      },
+      "synthesisLatency": {
+        "count": 40,
+        "total": 2091.699999690056,
+        "p50": 42.699999928474426,
+        "p95": 98.39999997615814,
+        "p99": 101.29999995231628,
+        "max": 101.29999995231628
+      },
+      "arpeggioLatenessMs": {
+        "count": 129,
+        "total": 0,
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0
+      }
+    },
+    "state": {
+      "markers": 69,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "audio": {
+        "rms": 0.1634651227524779,
+        "peak": 0.30966049432754517,
+        "state": "running",
+        "currentTime": 20.016,
+        "voices": 25,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": true,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 40,
+        "cacheBytes": 25866240
+      }
+    }
+  },
+  "cull-before": {
+    "durationMs": 20008.899999976158,
+    "conditions": {
+      "preset": "neonPulse",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&audioClock=1&cullScene=0",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "soundRequested": 162,
+      "canvasPaint": 543
+    },
+    "timings": {
+      "layout": {
+        "count": 186,
+        "total": 131.09999883174896,
+        "p50": 0.6999999284744263,
+        "p95": 0.8999999761581421,
+        "p99": 1.600000023841858,
+        "max": 2.200000047683716
+      },
+      "camera": {
+        "count": 581,
+        "total": 16.199999570846558,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 543,
+        "total": 66.64692138464062,
+        "p50": 0.023448347683256543,
+        "p95": 0.5241517450016318,
+        "p99": 2.6510889204196246,
+        "max": 7.079259556012062
+      },
+      "marksDrawn": {
+        "count": 543,
+        "total": 367176,
+        "p50": 678,
+        "p95": 753,
+        "p99": 760,
+        "max": 762
+      },
+      "labelsDrawn": {
+        "count": 543,
+        "total": 301162,
+        "p50": 557,
+        "p95": 616,
+        "p99": 621,
+        "max": 622
+      },
+      "canvasBuild": {
+        "count": 543,
+        "total": 1380.9000016450882,
+        "p50": 2.5,
+        "p95": 3.3000000715255737,
+        "p99": 3.899999976158142,
+        "max": 5.399999976158142
+      },
+      "frameInterval": {
+        "count": 580,
+        "total": 19950,
+        "p50": 33.30000000000109,
+        "p95": 49.79999999999927,
+        "p99": 50.30000000000018,
+        "max": 51.899999999999636
+      }
+    },
+    "state": {
+      "markers": 762,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "audio": {
+        "rms": null,
+        "peak": null,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    }
+  },
+  "cull-after": {
+    "durationMs": 20010.899999976158,
+    "conditions": {
+      "preset": "neonPulse",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&audioClock=1&cullScene=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 501,
+      "soundRequested": 162
+    },
+    "timings": {
+      "layout": {
+        "count": 179,
+        "total": 136.80000019073486,
+        "p50": 0.7000000476837158,
+        "p95": 1.100000023841858,
+        "p99": 1.9000000953674316,
+        "max": 4.199999928474426
+      },
+      "camera": {
+        "count": 582,
+        "total": 20.299999833106995,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 501,
+        "total": 66.3067119109692,
+        "p50": 0.024490107372457715,
+        "p95": 0.6296817589843613,
+        "p99": 2.68999657064694,
+        "max": 6.962873473721061
+      },
+      "marksDrawn": {
+        "count": 501,
+        "total": 184547,
+        "p50": 371,
+        "p95": 439,
+        "p99": 443,
+        "max": 445
+      },
+      "labelsDrawn": {
+        "count": 501,
+        "total": 11286,
+        "p50": 23,
+        "p95": 24,
+        "p99": 25,
+        "max": 25
+      },
+      "canvasBuild": {
+        "count": 501,
+        "total": 944.3000018596649,
+        "p50": 1.899999976158142,
+        "p95": 2.399999976158142,
+        "p99": 2.8000000715255737,
+        "max": 3.100000023841858
+      },
+      "frameInterval": {
+        "count": 581,
+        "total": 20000.1,
+        "p50": 33.399999999999636,
+        "p95": 49.69999999999999,
+        "p99": 50.700000000000045,
+        "max": 51.80000000000018
+      }
+    },
+    "state": {
+      "markers": 762,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "audio": {
+        "rms": null,
+        "peak": null,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    }
+  },
+  "native-0": {
+    "durationMs": 20007.899999976158,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&nativeSustain=0",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 497,
+      "soundRequested": 69,
+      "sampleCacheMiss": 39,
+      "samples": 39,
+      "effectsBusCreated": 1,
+      "voiceStarted": 130,
+      "eventVoiced": 69,
+      "sampleCacheHit": 91,
+      "harmonicsReduced": 61,
+      "voiceEnded": 106,
+      "voiceStolen": 2
+    },
+    "timings": {
+      "layout": {
+        "count": 181,
+        "total": 24.4000004529953,
+        "p50": 0.10000002384185791,
+        "p95": 0.20000004768371582,
+        "p99": 0.2999999523162842,
+        "max": 0.2999999523162842
+      },
+      "camera": {
+        "count": 582,
+        "total": 22.199999451637268,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 497,
+        "total": 566.6607442402626,
+        "p50": 0.38926282109167687,
+        "p95": 5.079260840721645,
+        "p99": 8.526043100048355,
+        "max": 13.2249312855065
+      },
+      "marksDrawn": {
+        "count": 497,
+        "total": 12654,
+        "p50": 27,
+        "p95": 49,
+        "p99": 50,
+        "max": 52
+      },
+      "labelsDrawn": {
+        "count": 497,
+        "total": 5540,
+        "p50": 13,
+        "p95": 19,
+        "p99": 20,
+        "max": 20
+      },
+      "canvasBuild": {
+        "count": 497,
+        "total": 281.5999994277954,
+        "p50": 0.6000000238418579,
+        "p95": 0.8000000715255737,
+        "p99": 1,
+        "max": 1.100000023841858
+      },
+      "frameInterval": {
+        "count": 581,
+        "total": 19951.600000000002,
+        "p50": 33.30000000000109,
+        "p95": 49.599999999998545,
+        "p99": 50.80000000000018,
+        "max": 52
+      },
+      "workerSynthesis": {
+        "count": 39,
+        "total": 989.8999996185303,
+        "p50": 22.699999928474426,
+        "p95": 39.10000002384186,
+        "p99": 40.5,
+        "max": 40.5
+      },
+      "synthesisLatency": {
+        "count": 39,
+        "total": 2116.200000524521,
+        "p50": 46.200000047683716,
+        "p95": 97.70000004768372,
+        "p99": 99.89999997615814,
+        "max": 99.89999997615814
+      },
+      "arpeggioLatenessMs": {
+        "count": 130,
+        "total": 0,
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0
+      }
+    },
+    "state": {
+      "markers": 69,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "audio": {
+        "rms": 0.08755874692069247,
+        "peak": 0.2026623785495758,
+        "state": "running",
+        "currentTime": 20.016,
+        "voices": 24,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": true,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 39,
+        "cacheBytes": 25219584
+      }
+    }
+  },
+  "native-1": {
+    "durationMs": 20009.299999952316,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&nativeSustain=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 475,
+      "soundRequested": 69,
+      "nativeVoice": 130,
+      "effectsBusCreated": 1,
+      "voiceStarted": 130,
+      "eventVoiced": 69,
+      "harmonicsReduced": 60,
+      "voiceEnded": 106,
+      "voiceStolen": 2
+    },
+    "timings": {
+      "layout": {
+        "count": 179,
+        "total": 19.399999260902405,
+        "p50": 0.10000002384185791,
+        "p95": 0.20000004768371582,
+        "p99": 0.40000009536743164,
+        "max": 0.8999999761581421
+      },
+      "camera": {
+        "count": 582,
+        "total": 21.100001096725464,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 475,
+        "total": 565.3175003099848,
+        "p50": 0.4366197991539025,
+        "p95": 5.1531779844260654,
+        "p99": 10.15852168144329,
+        "max": 16.80132022656585
+      },
+      "marksDrawn": {
+        "count": 475,
+        "total": 12299,
+        "p50": 27,
+        "p95": 49,
+        "p99": 50,
+        "max": 52
+      },
+      "labelsDrawn": {
+        "count": 475,
+        "total": 5369,
+        "p50": 13,
+        "p95": 19,
+        "p99": 19,
+        "max": 20
+      },
+      "canvasBuild": {
+        "count": 475,
+        "total": 279.59999990463257,
+        "p50": 0.6000000238418579,
+        "p95": 0.8999999761581421,
+        "p99": 0.9000000953674316,
+        "max": 1.2999999523162842
+      },
+      "frameInterval": {
+        "count": 581,
+        "total": 19983.6,
+        "p50": 33.39999999999782,
+        "p95": 49.100000000000364,
+        "p99": 51.099999999999454,
+        "max": 51.90000000000009
+      },
+      "arpeggioLatenessMs": {
+        "count": 130,
+        "total": 0,
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0
+      }
+    },
+    "state": {
+      "markers": 69,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "audio": {
+        "rms": 0.09206611036984533,
+        "peak": 0.2043813019990921,
+        "state": "running",
+        "currentTime": 20.016,
+        "voices": 24,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    }
+  },
+  "camera-0": {
+    "milliseconds": 1864.7000000476837,
+    "camera": {
+      "x": 581.6218479725892,
+      "y": 350.5670918227634,
+      "s": 1.0009323222403606
+    }
+  },
+  "camera-1": {
+    "milliseconds": 913.8999999761581,
+    "camera": {
+      "x": 581.6236050594707,
+      "y": 350.5680593083862,
+      "s": 1.000945766626369
+    }
+  },
+  "offscreen-0": {
+    "durationMs": 20017.300000071526,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&offscreen=0",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "soundRequested": 162,
+      "canvasPaint": 515
+    },
+    "timings": {
+      "layout": {
+        "count": 181,
+        "total": 129.5999995470047,
+        "p50": 0.6999999284744263,
+        "p95": 1,
+        "p99": 2.5,
+        "max": 4.100000023841858
+      },
+      "camera": {
+        "count": 577,
+        "total": 26.700000286102295,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 515,
+        "total": 66.49321105226528,
+        "p50": 0.024571699981379425,
+        "p95": 0.5574564043911323,
+        "p99": 2.692985360573857,
+        "max": 3.7029973062216186
+      },
+      "marksDrawn": {
+        "count": 515,
+        "total": 190112,
+        "p50": 371,
+        "p95": 440,
+        "p99": 443,
+        "max": 445
+      },
+      "labelsDrawn": {
+        "count": 515,
+        "total": 11589,
+        "p50": 23,
+        "p95": 24,
+        "p99": 25,
+        "max": 25
+      },
+      "canvasBuild": {
+        "count": 515,
+        "total": 949.6000000238419,
+        "p50": 1.8000000715255737,
+        "p95": 2.3000000715255737,
+        "p99": 2.700000047683716,
+        "max": 3.200000047683716
+      },
+      "mainPaint": {
+        "count": 515,
+        "total": 949.6000000238419,
+        "p50": 1.8000000715255737,
+        "p95": 2.3000000715255737,
+        "p99": 2.700000047683716,
+        "max": 3.200000047683716
+      },
+      "paintDispatch": {
+        "count": 515,
+        "total": 968.8000003099442,
+        "p50": 1.899999976158142,
+        "p95": 2.399999976158142,
+        "p99": 2.799999952316284,
+        "max": 3.5
+      },
+      "frameInterval": {
+        "count": 576,
+        "total": 19983.3,
+        "p50": 33.30000000000109,
+        "p95": 49.900000000001455,
+        "p99": 50.60000000000218,
+        "max": 166.60000000000036
+      }
+    },
+    "state": {
+      "markers": 762,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "renderer": {
+        "mode": "main",
+        "stopped": false,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": null,
+        "peak": null,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    },
+    "visibility": {
+      "hidden": false,
+      "focus": true
+    }
+  },
+  "offscreen-1": {
+    "durationMs": 20010.200000047684,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&offscreen=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 69,
+      "soundRequested": 157
+    },
+    "timings": {
+      "layout": {
+        "count": 24,
+        "total": 28.899999737739563,
+        "p50": 1,
+        "p95": 2.6999999284744263,
+        "p99": 3.1999999284744263,
+        "max": 3.1999999284744263
+      },
+      "camera": {
+        "count": 82,
+        "total": 3.9000000953674316,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "paintDispatch": {
+        "count": 69,
+        "total": 33.200000047683716,
+        "p50": 0.10000002384185791,
+        "p95": 1.399999976158142,
+        "p99": 1.600000023841858,
+        "max": 1.600000023841858
+      },
+      "bandStepPixels": {
+        "count": 69,
+        "total": 54.04575407005822,
+        "p50": 0.30161829366932125,
+        "p95": 3.5049562298689807,
+        "p99": 3.9453398853409,
+        "max": 3.9453398853409
+      },
+      "marksDrawn": {
+        "count": 69,
+        "total": 25146,
+        "p50": 359,
+        "p95": 433,
+        "p99": 440,
+        "max": 440
+      },
+      "labelsDrawn": {
+        "count": 69,
+        "total": 1524,
+        "p50": 23,
+        "p95": 24,
+        "p99": 24,
+        "max": 24
+      },
+      "canvasBuild": {
+        "count": 69,
+        "total": 174.10000026226044,
+        "p50": 2.5,
+        "p95": 3.5,
+        "p99": 4.299999952316284,
+        "max": 4.299999952316284
+      },
+      "workerPaint": {
+        "count": 69,
+        "total": 174.10000026226044,
+        "p50": 2.5,
+        "p95": 3.5,
+        "p99": 4.299999952316284,
+        "max": 4.299999952316284
+      },
+      "renderLatency": {
+        "count": 69,
+        "total": 309.4000002145767,
+        "p50": 3.299999952316284,
+        "p95": 9.100000023841858,
+        "p99": 9.800000071525574,
+        "max": 9.800000071525574
+      },
+      "frameInterval": {
+        "count": 81,
+        "total": 19282.6,
+        "p50": 33.400000000000006,
+        "p95": 1016.6000000000004,
+        "p99": 1016.7000000000007,
+        "max": 1016.7000000000007
+      }
+    },
+    "state": {
+      "markers": 757,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "renderer": {
+        "mode": "worker",
+        "stopped": false,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": null,
+        "peak": null,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    },
+    "visibility": {
+      "hidden": false,
+      "focus": true
+    }
+  },
+  "offscreen-raf": {
+    "durationMs": 10012.600000023842,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1&offscreen=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "soundRequested": 78,
+      "canvasPaint": 30
+    },
+    "timings": {
+      "layout": {
+        "count": 11,
+        "total": 16.49999988079071,
+        "p50": 1,
+        "p95": 7.299999952316284,
+        "p99": 7.299999952316284,
+        "max": 7.299999952316284
+      },
+      "camera": {
+        "count": 34,
+        "total": 0.8999999761581421,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "max": 0.10000002384185791
+      },
+      "paintDispatch": {
+        "count": 30,
+        "total": 14.699999928474426,
+        "p50": 0.10000002384185791,
+        "p95": 1.2999999523162842,
+        "p99": 1.399999976158142,
+        "max": 1.399999976158142
+      },
+      "bandStepPixels": {
+        "count": 30,
+        "total": 44.4111939404695,
+        "p50": 1.304691603415563,
+        "p95": 3.717652677667729,
+        "p99": 4.156003011590315,
+        "max": 4.156003011590315
+      },
+      "marksDrawn": {
+        "count": 30,
+        "total": 9957,
+        "p50": 330,
+        "p95": 368,
+        "p99": 369,
+        "max": 369
+      },
+      "labelsDrawn": {
+        "count": 30,
+        "total": 653,
+        "p50": 21,
+        "p95": 24,
+        "p99": 25,
+        "max": 25
+      },
+      "canvasBuild": {
+        "count": 30,
+        "total": 72.79999995231628,
+        "p50": 2.299999952316284,
+        "p95": 3.5,
+        "p99": 5.200000047683716,
+        "max": 5.200000047683716
+      },
+      "workerPaint": {
+        "count": 30,
+        "total": 72.79999995231628,
+        "p50": 2.299999952316284,
+        "p95": 3.5,
+        "p99": 5.200000047683716,
+        "max": 5.200000047683716
+      },
+      "renderLatency": {
+        "count": 30,
+        "total": 134.09999978542328,
+        "p50": 3.4000000953674316,
+        "p95": 8.299999952316284,
+        "p99": 8.300000071525574,
+        "max": 8.300000071525574
+      },
+      "frameInterval": {
+        "count": 33,
+        "total": 8933.2,
+        "p50": 33.599999999999454,
+        "p95": 1016.7000000000007,
+        "p99": 1016.9000000000005,
+        "max": 1016.9000000000005
+      }
+    },
+    "state": {
+      "markers": 678,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "renderer": {
+        "mode": "worker",
+        "stopped": false,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": null,
+        "peak": null,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    }
+  },
+  "combined": {
+    "durationMs": 20330.200000047684,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 495,
+      "soundRequested": 164,
+      "nativeVoice": 178,
+      "voiceStarted": 178,
+      "eventVoiced": 164,
+      "harmonicsReduced": 160,
+      "voiceStolen": 120,
+      "voiceEnded": 154
+    },
+    "timings": {
+      "layout": {
+        "count": 186,
+        "total": 152.89999961853027,
+        "p50": 0.7999999523162842,
+        "p95": 1.600000023841858,
+        "p99": 2.399999976158142,
+        "max": 2.8000000715255737
+      },
+      "camera": {
+        "count": 591,
+        "total": 25.800000309944153,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 495,
+        "total": 66.75409263674831,
+        "p50": 0.025836183427713877,
+        "p95": 0.6495766038461852,
+        "p99": 2.771511618242357,
+        "max": 5.2984780936984635
+      },
+      "marksDrawn": {
+        "count": 495,
+        "total": 103174,
+        "p50": 293,
+        "p95": 355,
+        "p99": 366,
+        "max": 368
+      },
+      "labelsDrawn": {
+        "count": 495,
+        "total": 6549,
+        "p50": 15,
+        "p95": 23,
+        "p99": 24,
+        "max": 24
+      },
+      "canvasBuild": {
+        "count": 495,
+        "total": 709.4999985694885,
+        "p50": 1.3000000715255737,
+        "p95": 2.100000023841858,
+        "p99": 2.5,
+        "max": 2.700000047683716
+      },
+      "mainPaint": {
+        "count": 495,
+        "total": 709.4999985694885,
+        "p50": 1.3000000715255737,
+        "p95": 2.100000023841858,
+        "p99": 2.5,
+        "max": 2.700000047683716
+      },
+      "paintDispatch": {
+        "count": 495,
+        "total": 720.3999984264374,
+        "p50": 1.399999976158142,
+        "p95": 2.100000023841858,
+        "p99": 2.5,
+        "max": 2.8000000715255737
+      },
+      "frameInterval": {
+        "count": 590,
+        "total": 20316.999999999996,
+        "p50": 33.30000000000291,
+        "p95": 49.89999999999418,
+        "p99": 51.400000000001455,
+        "max": 51.69999999999709
+      },
+      "arpeggioLatenessMs": {
+        "count": 178,
+        "total": 0,
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0
+      }
+    },
+    "state": {
+      "markers": 764,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 703.9095869535469,
+        "y": 397.9600107832022,
+        "s": 2.054433210643888
+      },
+      "renderer": {
+        "mode": "main",
+        "stopped": false,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": 0.12628832136671386,
+        "peak": 0.2532452344894409,
+        "state": "running",
+        "currentTime": 20.368,
+        "voices": 28,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    }
+  },
+  "idle": {
+    "durationMs": 18011.100000023842,
+    "conditions": {
+      "preset": "signalLoom",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 414
+    },
+    "timings": {
+      "layout": {
+        "count": 162,
+        "total": 89.00000011920929,
+        "p50": 0.5,
+        "p95": 0.6999999284744263,
+        "p99": 0.7000000476837158,
+        "max": 1.600000023841858
+      },
+      "camera": {
+        "count": 522,
+        "total": 32.19999957084656,
+        "p50": 0.09999990463256836,
+        "p95": 0.19999992847442627,
+        "p99": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 414,
+        "total": 56.511996528052464,
+        "p50": 5.996488835080527e-05,
+        "p95": 0.6701059493594812,
+        "p99": 2.7874959244800266,
+        "max": 7.329998401749208
+      },
+      "marksDrawn": {
+        "count": 414,
+        "total": 121435,
+        "p50": 293,
+        "p95": 298,
+        "p99": 298,
+        "max": 298
+      },
+      "labelsDrawn": {
+        "count": 414,
+        "total": 6758,
+        "p50": 16,
+        "p95": 19,
+        "p99": 20,
+        "max": 20
+      },
+      "canvasBuild": {
+        "count": 414,
+        "total": 632.2999995946884,
+        "p50": 1.5,
+        "p95": 1.8000000715255737,
+        "p99": 2.100000023841858,
+        "max": 2.700000047683716
+      },
+      "mainPaint": {
+        "count": 414,
+        "total": 632.2999995946884,
+        "p50": 1.5,
+        "p95": 1.8000000715255737,
+        "p99": 2.100000023841858,
+        "max": 2.700000047683716
+      },
+      "paintDispatch": {
+        "count": 414,
+        "total": 638.100000500679,
+        "p50": 1.5,
+        "p95": 1.8000000715255737,
+        "p99": 2.100000023841858,
+        "max": 2.700000047683716
+      },
+      "frameInterval": {
+        "count": 521,
+        "total": 17966.899999999994,
+        "p50": 33.30000000000291,
+        "p95": 50,
+        "p99": 51.70000000001164,
+        "max": 51.89999999999418
+      }
+    },
+    "state": {
+      "markers": 600,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "renderer": {
+        "mode": "main",
+        "stopped": false,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": 0.00018274206377100156,
+        "peak": 0.000182742063771002,
+        "state": "running",
+        "currentTime": 63.904,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    }
+  },
+  "worker-lifecycle": {
+    "hidden": {
+      "markers": 600,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "renderer": {
+        "mode": "main",
+        "stopped": true,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": null,
+        "peak": null,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    },
+    "targets": [],
+    "restored": {
+      "markers": 600,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "renderer": {
+        "mode": "worker",
+        "stopped": false,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": null,
+        "peak": null,
+        "voices": 0,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 0,
+        "effectTails": 0,
+        "cacheEntries": 0,
+        "cacheBytes": 0
+      }
+    }
+  },
+  "combined-zzfx": {
+    "durationMs": 20011.100000023842,
+    "conditions": {
+      "preset": "neonPulse",
+      "hidden": false,
+      "url": "http://127.0.0.1:8000/netloom.html?perf=1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "viewport": [
+        1163,
+        701
+      ],
+      "dpr": 2,
+      "tweaks": {
+        "inputFrequencyMul": 1,
+        "inputVolumeMul": 1,
+        "inputAmountMul": 1,
+        "adsr_attack": 0.008,
+        "adsr_decay": 0.14,
+        "adsr_sustainVol": 0.2,
+        "adsr_sustain": 0.42,
+        "adsr_release": 2.8,
+        "filterType": "lowpass",
+        "filterCutoff": 450,
+        "filterQ": 1.2,
+        "vol_circuitWeave": 1.2,
+        "vol_signalLoom": 1.2,
+        "vol_neonPulse": 1.3,
+        "layerVolBase": 1,
+        "layerVolStep": 0.15,
+        "gainMul": 5.5,
+        "reverbSec": 3.75,
+        "reverbDecayPow": 0.5,
+        "reverbEarlyBoost": 0.4,
+        "reverbEarlyRate": 1.25,
+        "delayBase": 0.2,
+        "delayStep": 0.04,
+        "feedbackBase": 0.22,
+        "feedbackMagScale": 0.02,
+        "dryGain": 0.85,
+        "wetGain": 0.32,
+        "cmpThreshold": -8,
+        "cmpKnee": 12,
+        "cmpRatio": 3,
+        "cmpAttack": 0.008,
+        "cmpRelease": 0.22
+      }
+    },
+    "counts": {
+      "scenario": 1,
+      "canvasPaint": 519,
+      "soundRequested": 162,
+      "sampleCacheMiss": 23,
+      "samples": 26,
+      "effectsBusCreated": 1,
+      "voiceStarted": 178,
+      "eventVoiced": 163,
+      "sampleCacheHit": 152,
+      "harmonicsReduced": 157,
+      "voiceStolen": 87,
+      "voiceEnded": 150
+    },
+    "timings": {
+      "layout": {
+        "count": 186,
+        "total": 141.89999961853027,
+        "p50": 0.7999999523162842,
+        "p95": 1,
+        "p99": 1.2999999523162842,
+        "max": 4.200000047683716
+      },
+      "camera": {
+        "count": 582,
+        "total": 24.700000762939453,
+        "p50": 0,
+        "p95": 0.10000002384185791,
+        "p99": 0.20000004768371582,
+        "max": 0.20000004768371582
+      },
+      "bandStepPixels": {
+        "count": 519,
+        "total": 66.53153564360747,
+        "p50": 0.025203890418140418,
+        "p95": 0.5498031511631325,
+        "p99": 2.1439733699450017,
+        "max": 5.461508188889297
+      },
+      "marksDrawn": {
+        "count": 519,
+        "total": 187905,
+        "p50": 365,
+        "p95": 432,
+        "p99": 439,
+        "max": 441
+      },
+      "labelsDrawn": {
+        "count": 519,
+        "total": 11361,
+        "p50": 22,
+        "p95": 24,
+        "p99": 24,
+        "max": 24
+      },
+      "canvasBuild": {
+        "count": 519,
+        "total": 904.200000166893,
+        "p50": 1.8000000715255737,
+        "p95": 2.200000047683716,
+        "p99": 2.399999976158142,
+        "max": 2.5
+      },
+      "mainPaint": {
+        "count": 519,
+        "total": 904.200000166893,
+        "p50": 1.8000000715255737,
+        "p95": 2.200000047683716,
+        "p99": 2.399999976158142,
+        "max": 2.5
+      },
+      "paintDispatch": {
+        "count": 519,
+        "total": 916.1000001430511,
+        "p50": 1.899999976158142,
+        "p95": 2.299999952316284,
+        "p99": 2.399999976158142,
+        "max": 2.600000023841858
+      },
+      "frameInterval": {
+        "count": 581,
+        "total": 20000.300000000003,
+        "p50": 33.30000000000109,
+        "p95": 49.900000000001455,
+        "p99": 51,
+        "max": 51.79999999999927
+      },
+      "workerSynthesis": {
+        "count": 26,
+        "total": 729.700000166893,
+        "p50": 29.90000009536743,
+        "p95": 41.89999997615814,
+        "p99": 42.10000002384186,
+        "max": 42.10000002384186
+      },
+      "synthesisLatency": {
+        "count": 26,
+        "total": 1314.0999994277954,
+        "p50": 42.200000047683716,
+        "p95": 84.59999990463257,
+        "p99": 92.60000002384186,
+        "max": 92.60000002384186
+      }
+    },
+    "state": {
+      "markers": 762,
+      "canvas": [
+        3200,
+        2000
+      ],
+      "camera": {
+        "x": 581.5,
+        "y": 350.5,
+        "s": 1
+      },
+      "renderer": {
+        "mode": "main",
+        "stopped": false,
+        "busy": false,
+        "queued": 0
+      },
+      "audio": {
+        "rms": 0.23947323877456864,
+        "peak": 0.4267864525318146,
+        "state": "running",
+        "currentTime": 20.021333333333335,
+        "voices": 28,
+        "scheduled": 0,
+        "retiring": 0,
+        "preparing": 0,
+        "workerJobs": 0,
+        "workerEnabled": true,
+        "workerActive": false,
+        "effectsBuses": 1,
+        "effectTails": 0,
+        "cacheEntries": 26,
+        "cacheBytes": 16813056
+      }
+    }
+  },
+  "pixelParity": {
+    "differentPixels": 0,
+    "history": 600,
+    "smoothScene": false,
+    "viewport": [
+      1163,
+      701
+    ],
+    "dpr": 2,
+    "crop": [
+      20,
+      160,
+      1100,
+      450
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "RasterDecoderImpl::DoRasterCHROMIUM": {
+    "thread": "CrGpuMain",
+    "count": 686,
+    "total_ms": 665.374,
+    "p95_ms": 2.861,
+    "max_ms": 3.115
+  },
+  "CommandBuffer::Flush": {
+    "thread": "CrGpuMain",
+    "count": 979,
+    "total_ms": 1139.016,
+    "p95_ms": 4.944,
+    "max_ms": 5.504
+  },
+  "LayerTreeHost::DoUpdateLayers": {
+    "thread": "CrRendererMain",
+    "count": 226,
+    "total_ms": 395.631,
+    "p95_ms": 2.207,
+    "max_ms": 3.041
+  },
+  "MainFrame.Draw": {
+    "thread": "Compositor",
+    "count": 226,
+    "total_ms": 78.306,
+    "p95_ms": 0.543,
+    "max_ms": 0.813
+  }
+}
