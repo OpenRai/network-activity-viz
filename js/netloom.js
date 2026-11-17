@@ -1,7 +1,8 @@
 (()=>{
 const $=id=>document.getElementById(id);
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
-const cv=$('c'),cx=cv.getContext('2d'),ov=$('o'),ox=ov.getContext('2d');
+let cv=$('c');const ov=$('o'),ox=ov.getContext('2d');
+const renderer=createNetloomRenderer(cv,{replace:canvas=>{cv=canvas},metrics:metrics=>{if(!globalThis.netloomPerf)return;for(const key of ['bandStepPixels','marksDrawn','labelsDrawn'])netloomPerf.record(key,metrics[key]);netloomPerf.record('canvasBuild',metrics.duration);netloomPerf.record(metrics.thread==='worker'?'workerPaint':'mainPaint',metrics.duration);if(metrics.latency!==undefined)netloomPerf.record('renderLatency',metrics.latency);netloomPerf.event('canvasPaint')}});
 let T=gallerySettings.memoryMs,Te=6e4,t0=Date.now(),cnt={},lastMsg=0,mode='sqrt',ev=[],markers=[],feedClient=null,last=null,dpr=1,tx=0,simulation=null;
 const soundFX=createSoundFX({profile:'cyber',onStatus:message=>{$('audioState').textContent=message}}),soundSet=$('soundSet');
 globalThis.netloomSoundFX=soundFX;
@@ -13,36 +14,26 @@ try{const saved=localStorage.getItem('netloom-sound-set');if([...soundSet.option
 soundFX.setSoundSet(soundSet.value);
 soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('netloom-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
 $('snd').onchange=()=>{if(!$('snd').checked){soundFX.disable();return}soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{$('audioState').textContent='Audio paused · turn sound off and on to retry.'})};
-let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,bandWeights=new Map(),drift=0,vignette,w,h,board,boardContext,glow,glowContext,camera={x:0,y:0,s:1},cameraControls;
+let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,bandWeights=new Map(),drift=0,vignette,w,h,camera={x:0,y:0,s:1},cameraControls;
 const PLANE_W=1600,PLANE_H=1000;
 const smoothScene=!RM&&!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('smoothScene')==='0');
 let lastCameraTime=performance.now();
 const timeCamera=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('cameraTime')==='0');
-let scene=null,lastLayoutAt=0;
+let scene=null,lastLayoutAt=0,viewMatrix=[1,0,0,1,0,0];
+const cullScene=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('cullScene')==='0');
 const useLabelCache=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('labelCache')==='0');
 function markerStyle(m){
  const seed=hashCode(m.hash||String(m.at));
  return {seed,caption:m.hash.slice(-12).toUpperCase()+' '+fmt(10**m.la),accountLabel:m.account.slice(-18)};
 }
-let grid;
 const useGridCache=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('gridCache')==='0');
-function paintGrid(c){
- c.fillStyle='#020b20';c.fillRect(0,0,PLANE_W,PLANE_H);c.lineWidth=.6;
- for(let row=0;row<44;row++){const y=30+row*22;c.strokeStyle=row%5?'#08233b':'#104059';c.beginPath();c.moveTo(0,y);c.lineTo(PLANE_W,y);c.stroke()}
- for(let col=0;col<64;col++){const x=col*26;c.strokeStyle=col%8?'#071a32':'#123149';c.beginPath();c.moveTo(x,0);c.lineTo(x,PLANE_H);c.stroke()}
-}
 function size(){
  const oldW=w||innerWidth,oldH=h||innerHeight;dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;
  if(cameraControls){camera.x+=(w-oldW)/2;camera.y+=(h-oldH)/2}else{camera={x:w/2,y:h/2,s:1};cameraControls=createMapControls(ov,camera,()=>({width:w,height:h,cx:w/2,cy:h/2}))}
- cv.width=Math.round(PLANE_W*dpr);cv.height=Math.round(PLANE_H*dpr);
- cx.setTransform(dpr,0,0,dpr,0,0);
- grid=document.createElement('canvas');grid.width=cv.width;grid.height=cv.height;
- const gc=grid.getContext('2d');gc.setTransform(dpr,0,0,dpr,0,0);paintGrid(gc);
+ renderer.resize(dpr);
  Object.assign(cv.style,{width:PLANE_W+'px',height:PLANE_H+'px',inset:'0 auto auto 0',transformOrigin:'0 0',willChange:'transform',imageRendering:'auto'});
  ov.width=Math.round(w*dpr);ov.height=Math.round(h*dpr);
  ox.setTransform(dpr,0,0,dpr,0,0);
- board=cv;boardContext=cx;
- if(!glow){glow=document.createElement('canvas');glow.width=400;glow.height=250;glowContext=glow.getContext('2d');glowContext.scale(.25,.25);}
  vignette=ox.createRadialGradient(w*.56,h*.48,Math.min(w,h)*.12,w*.55,h*.5,Math.max(w,h)*.58);
  vignette.addColorStop(0,'rgba(0,2,14,0)');vignette.addColorStop(.6,'rgba(0,2,14,.18)');vignette.addColorStop(1,'rgba(0,2,14,.98)');
  lastB=0;overlay(Date.now());
@@ -83,49 +74,9 @@ function prepareScene(now){
  lastLayoutAt=now;
 }
 function build(now){
- const c=boardContext,l=glowContext;c.clearRect(0,0,PLANE_W,PLANE_H);l.clearRect(0,0,PLANE_W,PLANE_H);
- if(useGridCache)c.drawImage(grid,0,0,PLANE_W,PLANE_H);else paintGrid(c);
- const {cells,receives}=scene;
- const progress=smoothScene?Math.max(0,Math.min(1,(now-scene.at)/100)):1;
- let maxStep=0;
- for(const cell of cells){
-  const previous=cell.m.lastPaintY??cell.fromY;
-  cell.age=now-cell.m.at;cell.x=60+(1-cell.age/Te)*1460;
-  cell.y=cell.fromY+(cell.targetY-cell.fromY)*progress;
-  maxStep=Math.max(maxStep,Math.abs(cell.y-previous));cell.m.lastPaintY=cell.y;
- }
- globalThis.netloomPerf?.record('bandStepPixels',maxStep);
- globalThis.netloomPerf?.event('canvasPaint');
- c.lineWidth=.8;
- for(const cell of cells){
-  const {m,x,y,seed,age}=cell;if(m.subtype!=='send')continue;
-  const destination=receives.get(m.hash);
-  // Unpaired marks terminate locally; only observed source references join blocks.
-  const end=destination||{x:Math.min(1550,x+45+seed%160),y:y+((seed>>>4)%7-3)*22};
-  c.strokeStyle=destination?'rgba(255,133,28,.85)':'rgba(230,98,22,.42)';c.beginPath();c.moveTo(x,y);c.lineTo(x+18,y);c.lineTo(x+18,end.y);c.lineTo(end.x,end.y);c.stroke();
-  if(seed%4===0){c.strokeStyle='rgba(255,173,37,.42)';c.strokeRect(x+12,y-5,24+seed%75,10);}
- }
- c.font='9px monospace';c.textBaseline='middle';
- for(const {m,style,x,y,seed,width,height,age} of cells){
-  const warm=m.subtype==='send',color=warm?(seed%7<2?(seed%3?'#ffb52b':'#ff482e'):(seed%9===0?'#d531b6':'#1687c6')):'#04d6ed';
-  const intensity=Math.max(.1,1-age/Te);
-  const fade=mode==='linear'?intensity:mode==='log'?Math.log1p(intensity*9)/Math.log(10):Math.sqrt(intensity);
-  c.globalAlpha=fade;c.fillStyle=color;if(warm&&seed%11===0){c.beginPath();c.arc(x+width/2,y,height*.8,0,Math.PI*2);c.fill()}else c.fillRect(x,y-height/2,width,height);
-  c.fillStyle=warm?'#ffc76b':'#2580a2';
-  c.globalAlpha=fade*.55;if(seed%2===0)c.fillText(style.caption,x-110,y+2);c.fillStyle='#174965';
-  if(seed%3===0)c.fillText(style.accountLabel,x-110,y+11);
-  if(seed%5===0){c.fillStyle='#b3f7ff';c.fillRect(x+2,y-height/2,Math.max(3,width*.4),1)}
-  l.globalAlpha=fade*(warm?.8:.45);l.fillStyle=color;l.fillRect(x-2,y-height/2-2,width+4,height+4);
-  if(!RM&&age<900){const pulse=1-age/900;l.globalAlpha=pulse;l.fillStyle='#d6fbff';l.fillRect(x-5,y-height/2-5,width+10,height+10)}
- }
- c.globalAlpha=l.globalAlpha=1;
- c.font='11px monospace';c.fillStyle='#408099';
- for(let i=0;i<=6;i++){c.fillText(i===6?'NOW':'−'+fd(Te*(1-i/6)),60+i*240,970)}
- for(let i=0;i<=8;i++){c.fillText(fmt(10**(scene.previousTicks[i]+(scene.ticks[i]-scene.previousTicks[i])*progress)),8,50+i*108)}
- // Bake bloom at quarter resolution; the display loop only composites one texture.
- c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.5;c.drawImage(glow,0,0,PLANE_W,PLANE_H);c.restore();
- boardWindow=Te;
+ renderer.paint({scene,now,mode,windowMs:Te,viewport:[w,h],matrix:viewMatrix,dpr,reducedMotion:RM,options:{smoothScene,cullScene,useGridCache}});
 }
+
 const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
 const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2))+' XNO';
 function render(){
@@ -142,6 +93,7 @@ function render(){
  }
  const frontierX=w*.94,frontierY=(h-68)*.84;
  const translateX=frontierX+drift-a*ratio*focusX-c*focusY,translateY=frontierY-b*ratio*focusX-d*focusY;
+ viewMatrix=[a*ratio*camera.s,b*ratio*camera.s,c*camera.s,d*camera.s,w/2+(translateX-camera.x)*camera.s,h/2+(translateY-camera.y)*camera.s];
  cv.style.transform=`matrix(${a*ratio*camera.s},${b*ratio*camera.s},${c*camera.s},${d*camera.s},${w/2+(translateX-camera.x)*camera.s},${h/2+(translateY-camera.y)*camera.s})`;
 }
 function overlay(now){
@@ -206,16 +158,17 @@ gallerySettings.onNodeChange(connect);
 gallerySettings.onMemoryChange(()=>{T=gallerySettings.memoryMs;});
 addEventListener('pointermove',e=>{if(!cameraControls.isGesture())tx=e.clientX/innerWidth-.5});
 addEventListener('resize',size);
+addEventListener('pagehide',()=>renderer.dispose());addEventListener('pageshow',()=>renderer.resume());
 setInterval(()=>{hud(Date.now());overlay(Date.now())},500);
-if(globalThis.netloomPerf)netloomPerf.attach({state:()=>({markers:markers.length,canvas:[cv.width,cv.height],camera:{...camera},audio:soundFX.diagnostics?.()}),start:({rate=5,seconds=30,audio=true,draw=true,history=0}={})=>{stop();resetStream();if(history){const historical=createStressDemo({seed:20261104,transfers:Math.ceil(history),duration:600000});for(const item of historical.events.slice(0,history)){item.message.hash='F'+item.message.hash.slice(1);if(item.message.block.subtype==='receive')item.message.block.link='F'+item.message.block.link.slice(1);handleConfirmation({topic:'confirmation',message:item.message},Date.now()-600000+item.at,true)}}const data=createStressDemo({seed:20261105,transfers:Math.ceil(rate*seconds),duration:seconds*1000+8000});simulation={...data,index:0,start:performance.now(),scale:1};globalThis.netloomPerfDraw=draw;if(audio)soundFX.enable();else soundFX.disable();}});
+if(globalThis.netloomPerf)netloomPerf.attach({state:()=>({markers:markers.length,canvas:[cv.width,cv.height],camera:{...camera},renderer:renderer.diagnostics(),audio:soundFX.diagnostics?.()}),start:({rate=5,seconds=30,audio=true,draw=true,history=0}={})=>{stop();resetStream();if(history){const historical=createStressDemo({seed:20261104,transfers:Math.ceil(history),duration:600000});for(const item of historical.events.slice(0,history)){item.message.hash='F'+item.message.hash.slice(1);if(item.message.block.subtype==='receive')item.message.block.link='F'+item.message.block.link.slice(1);handleConfirmation({topic:'confirmation',message:item.message},Date.now()-600000+item.at,true)}}const data=createStressDemo({seed:20261105,transfers:Math.ceil(rate*seconds),duration:seconds*1000+8000});simulation={...data,index:0,start:performance.now(),scale:1};globalThis.netloomPerfDraw=draw;if(audio)soundFX.enable();else soundFX.disable();}});
 size();connect();
 (function loop(){const now=Date.now();
 advanceSimulation(performance.now());
 Te=Math.min(T,Math.max(3000,now-(markers[0]?.at||t0)));
 if(!scene||now-lastLayoutAt>=100){if(globalThis.netloomPerf)netloomPerf.measure('layout',()=>prepareScene(now));else prepareScene(now)}
-if(now-lastB>=(smoothScene?1000/30-1:100)){
- if(globalThis.netloomPerf){if(globalThis.netloomPerfDraw!==false)netloomPerf.measure('canvasBuild',()=>build(now))}else build(now);
- lastB=now;
-}
-if(globalThis.netloomPerf)netloomPerf.measure("camera",render);else render();requestAnimationFrame(loop)})();
+const paintDue=now-lastB>=(smoothScene?1000/30-1:100);
+if(paintDue){lastB=now;boardWindow=Te}
+if(globalThis.netloomPerf)netloomPerf.measure("camera",render);else render();
+if(paintDue){if(globalThis.netloomPerf){if(globalThis.netloomPerfDraw!==false)netloomPerf.measure('paintDispatch',()=>build(now))}else build(now)}
+requestAnimationFrame(loop)})();
 })();
