@@ -16,6 +16,8 @@ $('snd').onchange=()=>{if(!$('snd').checked){soundFX.disable();return}soundFX.en
 let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,bandWeights=new Map(),drift=0,vignette,w,h,board,boardContext,glow,glowContext,camera={x:0,y:0,s:1},cameraControls;
 const PLANE_W=1600,PLANE_H=1000;
 const smoothScene=!RM&&!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('smoothScene')==='0');
+let lastCameraTime=performance.now();
+const timeCamera=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('cameraTime')==='0');
 let scene=null,lastLayoutAt=0;
 const useLabelCache=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('labelCache')==='0');
 function markerStyle(m){
@@ -127,14 +129,15 @@ function build(now){
 const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
 const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2))+' XNO';
 function render(){
+ const pn=performance.now(),ease=RM?1:timeCamera?netloomCameraEase(pn-lastCameraTime):.12;lastCameraTime=pn;
  const scale=Math.min(w/1450,h/850)*1.35;
- drift+=((RM||cameraControls.isGesture()?0:tx*12)-drift)*.12;
+ drift+=((RM||cameraControls.isGesture()?0:tx*12)-drift)*ease;
  // Animate the cached plane on the compositor, without repainting the viewport.
  const elapsed=Math.max(0,Math.min(Te,Date.now()-lastB)),ratio=boardWindow/Te;
  const a=scale*.91,b=-scale*.27,c=scale*.48,d=scale*.59;
  const focusX=1520+elapsed/Te*1460,focusY=970;
  if(cameraControls.springing()){
-  camera.x+=(w/2-camera.x)*.12;camera.y+=(h/2-camera.y)*.12;camera.s+=(1-camera.s)*.12;
+  camera.x+=(w/2-camera.x)*ease;camera.y+=(h/2-camera.y)*ease;camera.s+=(1-camera.s)*ease;
   if(Math.abs(camera.x-w/2)<.05&&Math.abs(camera.y-h/2)<.05&&Math.abs(camera.s-1)<.0005){camera.x=w/2;camera.y=h/2;camera.s=1;cameraControls.setDefaultScale(1)}
  }
  const frontierX=w*.94,frontierY=(h-68)*.84;
@@ -204,7 +207,7 @@ gallerySettings.onMemoryChange(()=>{T=gallerySettings.memoryMs;});
 addEventListener('pointermove',e=>{if(!cameraControls.isGesture())tx=e.clientX/innerWidth-.5});
 addEventListener('resize',size);
 setInterval(()=>{hud(Date.now());overlay(Date.now())},500);
-if(globalThis.netloomPerf)netloomPerf.attach({state:()=>({markers:markers.length,canvas:[cv.width,cv.height],audio:soundFX.diagnostics?.()}),start:({rate=5,seconds=30,audio=true,draw=true,history=0}={})=>{stop();resetStream();if(history){const historical=createStressDemo({seed:20261104,transfers:Math.ceil(history),duration:600000});for(const item of historical.events.slice(0,history)){item.message.hash='F'+item.message.hash.slice(1);if(item.message.block.subtype==='receive')item.message.block.link='F'+item.message.block.link.slice(1);handleConfirmation({topic:'confirmation',message:item.message},Date.now()-600000+item.at,true)}}const data=createStressDemo({seed:20261105,transfers:Math.ceil(rate*seconds),duration:seconds*1000+8000});simulation={...data,index:0,start:performance.now(),scale:1};globalThis.netloomPerfDraw=draw;if(audio)soundFX.enable();else soundFX.disable();}});
+if(globalThis.netloomPerf)netloomPerf.attach({state:()=>({markers:markers.length,canvas:[cv.width,cv.height],camera:{...camera},audio:soundFX.diagnostics?.()}),start:({rate=5,seconds=30,audio=true,draw=true,history=0}={})=>{stop();resetStream();if(history){const historical=createStressDemo({seed:20261104,transfers:Math.ceil(history),duration:600000});for(const item of historical.events.slice(0,history)){item.message.hash='F'+item.message.hash.slice(1);if(item.message.block.subtype==='receive')item.message.block.link='F'+item.message.block.link.slice(1);handleConfirmation({topic:'confirmation',message:item.message},Date.now()-600000+item.at,true)}}const data=createStressDemo({seed:20261105,transfers:Math.ceil(rate*seconds),duration:seconds*1000+8000});simulation={...data,index:0,start:performance.now(),scale:1};globalThis.netloomPerfDraw=draw;if(audio)soundFX.enable();else soundFX.disable();}});
 size();connect();
 (function loop(){const now=Date.now();
 advanceSimulation(performance.now());
