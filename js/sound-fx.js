@@ -42,6 +42,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     pending?.cancel();
     pending = null;
     clearVoices();
+    masterGain?.disconnect();
     const old = context;
     context = null;
     impulseContext = null; impulseBuffer = null; masterGain = null; masterLimiter = null; masterShaper = null;
@@ -72,6 +73,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     oscillator ||= new WebAssembly.Instance(new WebAssembly.Module(wasmBytes)).exports;
     const target = context;
     if (target.state === 'running') return Promise.resolve();
+    clearVoices();
 
     let cancel, timer;
     const cancelled = new Promise((_, reject) => { cancel = () => reject(new Error('Audio recovery cancelled.')); });
@@ -93,10 +95,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       queued = null;
       if (cue && Date.now() - cue.at < 2000) play(cue.options);
     }).catch(error => {
-      // Do NOT destroy the AudioContext on background timeout; keep it alive to resume on return
-      if (!document.hidden && context === target && context.state === 'closed') {
-        release();
-      }
+      // Hidden tabs may have browser-managed suspension; retain their context.
+      if (!document.hidden && context === target) release();
+      throw error;
     }).finally(() => {
       clearTimeout(timer);
       if (pending === operation) pending = null;
@@ -104,13 +105,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     return operation.promise;
   }
   function recover() {
-    if (enabled && !disposed) {
-      if (context && (context.state === 'suspended' || context.state === 'interrupted')) {
-        context.resume().catch(() => {});
-      } else {
-        ready().catch(() => {});
-      }
-    }
+    if (enabled && !disposed) ready().catch(() => {});
   }
   function visibility() {
     isHidden = document.hidden;
@@ -122,6 +117,8 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     [window, 'keydown', recover],
     [window, 'focus', recover],
     [window, 'pageshow', recover],
+    [window, 'pagehide', release],
+    [document, 'freeze', release],
     [document, 'visibilitychange', visibility]
   ];
   for (const [target, type, listener] of listeners) target.addEventListener(type, listener);
@@ -150,13 +147,14 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     if (context && masterGain) masterGain.gain.setTargetAtTime(volumeMultiplier, context.currentTime, .015);
   }
   function play({frequency = 440, volume = 0.15, duration, outside = false, account = '', amount = 0.001, subtype = 'send', at = Date.now(), hash = '', lfoDepth = profile === 'alien' ? .24 : .12} = {}) {
+    globalThis.netloomPerf?.event('soundRequested');
     if (!enabled || disposed) return false;
     if (context?.state !== 'running') {
       queued = {options: {frequency, volume, duration, outside, account, amount, subtype, at, hash, lfoDepth}, at: Date.now()};
       recover();
       return false;
     }
-    if (voices.size >= (profile === 'cyber' && backend === 'zzfx' ? 28 : 12)) return false;
+    if (voices.size >= (profile === 'cyber' && backend === 'zzfx' ? 28 : 12)) {globalThis.netloomPerf?.event('soundRejected',{reason:'capacity',voices:voices.size});return false;}
     const preset = sets[selected];
     const magnitude = Math.max(0, Math.min(1, (Math.log10(Math.max(1e-30, amount)) + 5) / 10));
     const eventTone = subtype === 'send' ? 1 : subtype === 'open' ? 1.12 : .92;
@@ -193,6 +191,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       if (!buildSamplesFn) { onStatus('ZzFX could not load. Reload the page to retry.'); return false; }
       if (globalThis.ZZFX) globalThis.ZZFX.sampleRate = context.sampleRate;
       const T = Object.assign({
+        inputFrequencyMul: 1, inputVolumeMul: 1, inputAmountMul: 1,
         // ── preset base volumes ──────────────────────────────────
         vol_circuitWeave: 1.2, vol_signalLoom: 1.2, vol_neonPulse: 1.3,
         // ── ADSR envelope (overrides if set) ─────────────────────
@@ -267,7 +266,8 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
         if (selected !== 'handsetSolace') layer[14] = z[14] * (0.8 + (index % 3) * 0.2);
 
         // Synthesize samples directly into a clean buffer
-        const rawSamples = buildSamplesFn(...layer);
+        const rawSamples = globalThis.netloomPerf ? netloomPerf.measure('synthesis',()=>buildSamplesFn(...layer)) : buildSamplesFn(...layer);
+        globalThis.netloomPerf?.event('samples',{bytes:rawSamples.byteLength});
         const buffer = context.createBuffer(1, rawSamples.length, context.sampleRate);
         buffer.getChannelData(0).set(rawSamples);
         const source = context.createBufferSource();
@@ -366,7 +366,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
         // Zero-click 5ms linear onset ramp from absolute 0 eliminates clicks at start
         gain.gain.setValueAtTime(0, now);
         gain.gain.linearRampToValueAtTime(Math.max(0.0001, targetGain), now + 0.005);
-        source.start(now);
+        source.start(now);globalThis.netloomPerf?.event('voiceStarted',{voices:voices.size});
         voices.add(source);
 
         // Allow full note release + reverb tail + delay feedback to ring out completely
@@ -379,7 +379,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
 
         source.onended = () => {
           clearTimeout(expiry);
-          voices.delete(source);
+          voices.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size});
           source.onended = null;
           source.disconnect();
           setTimeout(() => {
@@ -512,11 +512,11 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     }, duration * 1000 + 1000);
     source.onended = () => {
       clearTimeout(expiry);
-      voices.delete(source); source.onended = null;
+      voices.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size}); source.onended = null;
       source.disconnect(); gain.disconnect(); source.buffer = null;
     };
     source.start();
     return true;
   }
-  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose};
+  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>({state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size})};
 }

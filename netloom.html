@@ -146,11 +146,12 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <script src="js/event-utils.js"></script>
 <script src="js/event-cache.js"></script>
 <script src="js/nano-feed.js"></script>
+<script src="js/netloom-perf.js"></script>
 <script src="js/sound-fx.js?v=netloom-sfx-8"></script>
 <script src="js/zzfx-parameters.js?v=netloom-sfx-8"></script>
 <script src="js/stress-demo.js"></script>
 <script src="js/map-controls.js?v=guard-1"></script>
-<script src="js/netloom.js?v=netloom-backends-7"></script>
+<script src="js/netloom.js?perf-instrumentation=1"></script>
 <script>
 (()=>{
   document.getElementById('tweakPanel').hidden=new URLSearchParams(location.search).get('tweaks')!=='1';

@@ -2,7 +2,7 @@ import {test,expect} from 'bun:test';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 function harness(){
- const c=vm.createContext({VIEW:'score',$:()=>({}),shortAccount:x=>x,formatNanoAmount:x=>x,viewOptions:{},visualItems:new Map()});
+ const c=vm.createContext({VIEW:'eventsky',$:()=>({}),shortAccount:x=>x,formatNanoAmount:x=>x,viewOptions:{},visualItems:new Map()});
  for(const file of ['event-utils','visualizer-core'])vm.runInContext(readFileSync(new URL('../js/'+file+'.js',import.meta.url),'utf8'),c);
  vm.runInContext('clearRecording();state.time=100;',c);
  return c;
@@ -30,4 +30,10 @@ test('stress vote messages are explicitly labeled simulated',()=>{
  c.updateConsensusPanel({votes:[]});
  expect(elements.get('voteState').textContent).toContain('SIMULATED');
  expect(elements.get('orvSummary').textContent).toContain('simulated vote messages');
+});
+test('the core excludes expired and future blocks from replay-window models',()=>{
+ const c=harness();
+ for(const [hash,at]of [['OLD',0],['RECENT',55000],['FUTURE',61000]])c.ingest({topic:'confirmation',message:{hash,account:'nano_test',amount:'1',block:{subtype:'send',link_as_account:'nano_other'}}},at);
+ vm.runInContext('state.time=60000;state.windowMs=10000',c);
+ expect(c.model().blocks.map(b=>b.hash)).toEqual(['RECENT']);
 });

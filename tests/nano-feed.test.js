@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
-const pages=['index','constellation','hangtime','score','lattice','starmap'];
+const pages=['starmap','nano-atlas','eventsky','netloom'];
 const source=readFileSync(root+'js/nano-feed.js','utf8');
 function harness(endpoint='wss://test.example/ws'){
  let now=0,id=0;const timers=new Map(),sockets=[],statuses=[],packets=[],gaps=[];
@@ -23,7 +23,7 @@ function harness(endpoint='wss://test.example/ws'){
  function advance(ms){const target=now+ms;for(;;){const next=[...timers].filter(([,t])=>t.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;timers.delete(next[0]);now=next[1].at;next[1].fn()}now=target}
  return {client,sockets,statuses,packets,gaps,timers,advance,document,window};
 }
-test('all six pages load the shared transport exactly once',()=>{for(const name of pages){const html=readFileSync(root+name+'.html','utf8');expect(html.match(/src="js\/nano-feed\.js"/g)?.length).toBe(1);expect(html).not.toContain('function createNanoFeed(')}});
+test('all four visualizations load the shared transport exactly once',()=>{for(const name of pages){const html=readFileSync(root+name+'.html','utf8');expect(html.match(/src="js\/nano-feed\.js"/g)?.length).toBe(1);expect(html).not.toContain('function createNanoFeed(')}});
 test('ongoing confirmations keep one connection alive beyond three minutes',()=>{
  const h=harness(),s=h.sockets[0];s.open();s.message({ack:'pong'});
  for(let i=0;i<13;i++){h.advance(15000);s.message({ack:'pong'});s.message({topic:'confirmation',message:{hash:String(i)}})}

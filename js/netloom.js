@@ -176,10 +176,11 @@ gallerySettings.onMemoryChange(()=>{T=gallerySettings.memoryMs;});
 addEventListener('pointermove',e=>{if(!cameraControls.isGesture())tx=e.clientX/innerWidth-.5});
 addEventListener('resize',size);
 setInterval(()=>{hud(Date.now());overlay(Date.now())},500);
+if(globalThis.netloomPerf)netloomPerf.attach({state:()=>({markers:markers.length,canvas:[cv.width,cv.height],audio:soundFX.diagnostics?.()}),start:({rate=5,seconds=30,audio=true,draw=true}={})=>{stop();resetStream();const data=createStressDemo({seed:20261105,transfers:Math.ceil(rate*seconds),duration:seconds*1000+8000});simulation={...data,index:0,start:performance.now(),scale:1};globalThis.netloomPerfDraw=draw;if(audio)soundFX.enable();else soundFX.disable();}});
 size();connect();
 (function loop(){const now=Date.now();
 advanceSimulation(performance.now());
 Te=Math.min(T,Math.max(3000,now-(markers[0]?.at||t0)));
-if(now-lastB>=100){build(now);lastB=now}
-render();requestAnimationFrame(loop)})();
+if(now-lastB>=100){if(globalThis.netloomPerf){if(globalThis.netloomPerfDraw!==false)netloomPerf.measure("canvasBuild",()=>build(now))}else build(now);lastB=now}
+if(globalThis.netloomPerf)netloomPerf.measure("camera",render);else render();requestAnimationFrame(loop)})();
 })();

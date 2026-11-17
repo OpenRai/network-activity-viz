@@ -2,21 +2,28 @@ import {test,expect} from 'bun:test';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('../js/sound-fx.js',import.meta.url),'utf8');
-function harness(fail=false){
+function harness(fail=false,profile='ethereal'){
  const contexts=[],buffers=[],voices=[],gains=[];
  let now=Date.now();class Clock extends Date {static now(){return now}}
  class AudioContext {
-  constructor(){contexts.push(this);this.state='suspended';this.sampleRate=48000;this.destination={}}
+  constructor(){contexts.push(this);this.currentTime=1;this.state='suspended';this.sampleRate=48000;this.destination={}}
   async resume(){this.resumes=(this.resumes||0)+1;if(this.resumeHook)return this.resumeHook();if(fail)throw Error('Audio blocked');this.state='running'}
   async close(){this.state='closed';this.closed=true}
   createBuffer(channels,length){const samples=new Float32Array(length);buffers.push(samples);return{getChannelData:()=>samples}}
   createBufferSource(){const voice={connect(){},disconnect(){this.disconnected=true},start(){this.started=true},stop(){this.stopped=true;this.onended?.()}};voices.push(voice);return voice}
-  createGain(){const gain={gain:{value:0},connect(){},disconnect(){this.disconnected=true}};gains.push(gain);return gain}
+  createBiquadFilter(){return this.effect(['frequency','Q'])}
+  createDelay(){return this.effect(['delayTime'])}
+  createConvolver(){return this.effect([])}
+  createDynamicsCompressor(){return this.effect(['threshold','knee','ratio','attack','release'])}
+  createWaveShaper(){return this.effect([])}
+  effect(keys){const node={context:this,connect(){},disconnect(){this.disconnected=true}};for(const key of keys)node[key]={value:0,setValueAtTime(v){this.value=v},exponentialRampToValueAtTime(v){this.value=v}};return node}
+  createGain(){const param={value:0,setTargetAtTime(v){this.value=v},setValueAtTime(v){this.value=v},linearRampToValueAtTime(v){this.value=v}};const gain={gain:param,connect(){},disconnect(){this.disconnected=true}};gains.push(gain);return gain}
  }
  const window=new EventTarget(),document=new EventTarget();window.AudioContext=AudioContext;
  const context=vm.createContext({window,document,WebAssembly,Uint8Array,setTimeout,clearTimeout,Date:Clock});
+ vm.runInContext(readFileSync(new URL('../js/zzfx-parameters.js',import.meta.url),'utf8'),context);
  vm.runInContext(source,context);
- return{fx:context.createSoundFX(),contexts,buffers,voices,gains,window,document,elapse:ms=>{now+=ms}};
+ return{fx:context.createSoundFX({profile}),contexts,buffers,voices,gains,window,document,elapse:ms=>{now+=ms}};
 }
 test('sound requires opt-in and WASM generates a finite, nonzero waveform',async()=>{
  const h=harness();expect(h.fx.play()).toBe(false);expect(h.contexts.length).toBe(0);
@@ -36,7 +43,7 @@ test('bursts have bounded polyphony',async()=>{
 test('every preset boosts tonal cues while preserving swoosh gain',async()=>{
  for(const preset of ['air','aurora','ascent','cascade','choir','velvet','orbit']){
   const h=harness();await h.fx.enable();h.fx.setSoundSet(preset);
-  h.fx.play({volume:.1});expect(h.gains.at(-1).gain.value).toBeCloseTo(.25);
+  h.fx.play({volume:.1});expect(h.gains.at(-1).gain.value).toBeCloseTo(.3);
   h.fx.disable();await h.fx.enable();
   h.fx.play({volume:.1,outside:true});expect(h.gains.at(-1).gain.value).toBeCloseTo(.1);
  }
@@ -95,4 +102,24 @@ test('a stalled running audio clock cannot leak voices or permanently fill polyp
  h.fx.play({duration:.001});await new Promise(resolve=>setTimeout(resolve,1100));
  expect(h.contexts[0].closed).toBe(true);expect(h.voices[0].buffer).toBe(null);
  await h.fx.enable();expect(h.fx.play({duration:.001})).toBe(true);h.fx.dispose();
+});
+
+test('master volume remains independent of the original Starmap waveform',async()=>{
+ const h=harness();h.fx.setVolumeMultiplier(.5);await h.fx.enable();
+ expect(h.gains[0].gain.value).toBeCloseTo(2*Math.pow(.5,1.65));
+ h.fx.setVolumeMultiplier(1.5);expect(h.gains[0].gain.value).toBeCloseTo(2*Math.pow(1.5,1.65));h.fx.dispose();
+});
+test('NetLoom presets synthesize finite pitched buffers through ZzFX',async()=>{
+ for(const preset of ['circuitWeave','signalLoom','neonPulse','handsetSolace']){
+  const h=harness(false,'cyber');await h.fx.enable();h.fx.setSoundSet(preset);
+  expect(h.fx.play({frequency:440,amount:1,account:'nano_test',hash:'A',subtype:'send'})).toBe(true);
+  expect(h.voices.length).toBeGreaterThan(0);
+  for(const voice of h.voices){const data=voice.buffer.getChannelData(0);expect(data.every(Number.isFinite)).toBe(true);expect(data.some(x=>Math.abs(x)>.01)).toBe(true)}
+  h.fx.dispose();expect(h.voices.every(v=>v.buffer===null)).toBe(true);expect(h.fx.diagnostics().scheduled).toBe(0);
+ }
+});
+test('ordinary background visibility preserves the audio context',async()=>{
+ const h=harness();await h.fx.enable();h.document.hidden=true;h.document.dispatchEvent(new Event('visibilitychange'));
+ expect(h.contexts[0].closed).toBeUndefined();h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));
+ expect(h.contexts).toHaveLength(1);h.fx.dispose();
 });
