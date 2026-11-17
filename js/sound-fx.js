@@ -5,7 +5,54 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
   const wasmBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 125, 1, 125, 3, 2, 1, 0, 7, 10, 1, 6, 115, 97, 109, 112, 108, 101, 0, 0, 10, 52, 1, 50, 1, 1, 125, 67, 0, 0, 128, 63, 67, 0, 0, 128, 64, 32, 0, 67, 0, 0, 0, 63, 147, 139, 148, 147, 33, 1, 67, 0, 0, 192, 63, 32, 1, 148, 67, 0, 0, 0, 63, 32, 1, 32, 1, 32, 1, 148, 148, 148, 147, 11]);
   let context = null, oscillator = null, enabled = false;
   const voices = new Set();
+  const sampleCache = new Map();
+  let sampleCacheBytes = 0;
+  const useSampleCache = !(globalThis.netloomPerf && new URLSearchParams(location.search).get('sampleCache') === '0');
   const scheduledVoices = new Set();
+  const workerSynthesis = profile === 'cyber' && typeof Worker !== 'undefined' && globalThis.location?.protocol !== 'file:' && typeof createZzfxWorkerClient === 'function'
+    && !(globalThis.netloomPerf && new URLSearchParams(location.search).get('workerSynthesis') === '0');
+  const synthesisWorker = workerSynthesis ? createZzfxWorkerClient() : null;
+  const pendingSamples = new Map();
+  let synthesisGeneration = 0, preparingVoices = 0, workerFailed = false;
+  const useSharedEffects = !(globalThis.netloomPerf && new URLSearchParams(location.search).get('sharedEffects') === '0');
+  let sharedEffects = null, sharedTailTimer = null;
+  const effectTails = new Map();
+  function disconnectNodes(nodes) { for (const node of nodes) try { node.disconnect(); } catch {} }
+  function clearSharedEffects() {
+    clearTimeout(sharedTailTimer); sharedTailTimer = null;
+    if (sharedEffects) disconnectNodes(sharedEffects.nodes);
+    sharedEffects = null;
+  }
+  function scheduleSharedTail() {
+    if (!sharedEffects || voices.size || scheduledVoices.size || preparingVoices) return;
+    clearTimeout(sharedTailTimer);
+    sharedTailTimer = setTimeout(() => {
+      if (!voices.size && !scheduledVoices.size && !preparingVoices) clearSharedEffects();
+    }, sharedEffects.tailSeconds * 1000);
+  }
+  function sharedBus(T) {
+    clearTimeout(sharedTailTimer); sharedTailTimer = null;
+    const key = JSON.stringify([T.delayBase,T.delayStep,T.feedbackBase,T.feedbackMagScale,T.dryGain,T.wetGain,T.cmpThreshold,T.cmpKnee,T.cmpRatio,T.cmpAttack,T.cmpRelease]);
+    if (!sharedEffects) {
+      const dry=context.createGain(),delay=context.createDelay(4),feedback=context.createGain(),wet=context.createGain(),convolver=context.createConvolver(),compressor=context.createDynamicsCompressor();
+      dry.connect(compressor);delay.connect(feedback);feedback.connect(delay);delay.connect(convolver);convolver.connect(wet);wet.connect(compressor);
+      // The shared output feeds the existing master safety stage.
+      compressor.connect(masterLimiter);
+      sharedEffects={dry,delay,feedback,wet,convolver,compressor,nodes:[dry,delay,feedback,wet,convolver,compressor]};
+      globalThis.netloomPerf?.event('effectsBusCreated');
+    }
+    const bus=sharedEffects,now=context.currentTime;
+    if (bus.impulse !== impulseBuffer) { bus.convolver.buffer=impulseBuffer;bus.impulse=impulseBuffer; }
+    if (bus.key !== key) {
+      bus.key=key;
+      bus.delay.delayTime.setTargetAtTime(Math.max(.01,Math.min(3,T.delayBase+3*T.delayStep)),now,.03);
+      bus.feedback.gain.setTargetAtTime(Math.max(0,Math.min(.6,T.feedbackBase+.5*T.feedbackMagScale)),now,.03);
+      bus.dry.gain.setTargetAtTime(T.dryGain,now,.03);bus.wet.gain.setTargetAtTime(T.wetGain,now,.03);
+      for (const [param,value] of [['threshold',T.cmpThreshold],['knee',T.cmpKnee],['ratio',T.cmpRatio],['attack',T.cmpAttack],['release',T.cmpRelease]])bus.compressor[param].value=value;
+    }
+    bus.tailSeconds=Math.min(20,T.reverbSec+5);
+    return bus;
+  }
   let impulseContext=null, impulseBuffer=null;
   const sets = {
     air: {duration:1.2, decay:4, attack:.08},
@@ -28,9 +75,11 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
   };
   let selected = 'air', backend = profile === 'cyber' ? 'zzfx' : 'legacy', volumeMultiplier = 1;
   let pending = null, queued = null, disposed = false;
-  let masterGain = null, masterLimiter = null, masterShaper = null;
+  let masterGain = null, masterLimiter = null, masterShaper = null, outputProbe = null;
   let isHidden = typeof document !== 'undefined' ? document.hidden : false;
   function clearVoices() {
+    synthesisGeneration++; preparingVoices = 0;
+    synthesisWorker?.cancelAll(); pendingSamples.clear();
     for(const timer of scheduledVoices)clearTimeout(timer);scheduledVoices.clear();
     for (const voice of [...voices]) {
       try { voice.stop(); } catch {}
@@ -42,7 +91,12 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     pending?.cancel();
     pending = null;
     clearVoices();
+    clearSharedEffects();
+    for (const [timer,nodes] of effectTails) { clearTimeout(timer); disconnectNodes(nodes); }
+    effectTails.clear();
+    outputProbe?.disconnect();outputProbe=null;
     masterGain?.disconnect();
+    sampleCache.clear(); sampleCacheBytes = 0;
     const old = context;
     context = null;
     impulseContext = null; impulseBuffer = null; masterGain = null; masterLimiter = null; masterShaper = null;
@@ -61,7 +115,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       catch (error) { return Promise.reject(error); }
       masterGain = context.createGain();
       masterGain.gain.value = volumeMultiplier;
-      masterGain.connect(context.destination);
+      if (profile==='cyber' && globalThis.netloomPerf) {
+        outputProbe=context.createAnalyser();outputProbe.fftSize=256;masterGain.connect(outputProbe);outputProbe.connect(context.destination);
+      } else masterGain.connect(context.destination);
       context.onstatechange = () => {
         if (enabled && context?.state === 'running') {
           onStatus('Sound enabled · pitch follows amount.');
@@ -126,6 +182,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     if (!sets[name] || name === selected) return;
     clearVoices();
     queued = null;
+    clearSharedEffects();
     selected = name;
   }
   function stop() { enabled = false; release(); onStatus(''); }
@@ -252,8 +309,10 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       const allLayers = patterns[selected] || [0];
       const layers = allLayers;
       const filterMagnitude = selected === 'handsetSolace' ? 0.5 : magnitude;
-      const owner = context;
+      const owner = context, generation = synthesisGeneration;
       const launchLayer = index => {
+        if (context !== owner || generation !== synthesisGeneration || !enabled) return;
+        if (voices.size + preparingVoices >= 28) { globalThis.netloomPerf?.event('layerRejected',{reason:'capacity'}); return; }
         const degree = layers[index], layer = [...z], direction = subtype === 'receive' ? -1 : 1;
         // Fundamental is loudest; higher harmonics support naturally without tinny squeaks
         const layerVol = (index === 0 ? 1.0 : 0.65 / Math.sqrt(index)) * T.layerVolBase;
@@ -265,130 +324,182 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
                    selected === 'signalLoom' ? (index % 2 ? 1 : 0) : 0;
         if (selected !== 'handsetSolace') layer[14] = z[14] * (0.8 + (index % 3) * 0.2);
 
-        // Synthesize samples directly into a clean buffer
-        const rawSamples = globalThis.netloomPerf ? netloomPerf.measure('synthesis',()=>buildSamplesFn(...layer)) : buildSamplesFn(...layer);
-        globalThis.netloomPerf?.event('samples',{bytes:rawSamples.byteLength});
-        const buffer = context.createBuffer(1, rawSamples.length, context.sampleRate);
-        buffer.getChannelData(0).set(rawSamples);
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        const gain = context.createGain();
-        source.gainNode = gain;
-
-        const filter = context.createBiquadFilter(), dry = context.createGain();
-        const delay = context.createDelay(4), feedback = context.createGain(), wet = context.createGain();
-        const convolver = context.createConvolver(), compressor = context.createDynamicsCompressor();
-
-        // Resonant filter contour: "HO-oooOT" / "PA-wwwoaAo"
-        filter.type = T.filterType || 'lowpass';
-        filter.Q.value = T.filterQ;
-        const baseCutoff = T.filterCutoff || 450;
-        const now = context.currentTime;
-        const startCutoff = Math.min(16000, Math.max(300, baseCutoff * (2.4 + filterMagnitude * 0.6)));
-        const valleyCutoff = Math.min(12000, Math.max(120, baseCutoff * (0.85 + filterMagnitude * 0.15)));
-        const sustainCutoff = Math.min(14000, Math.max(160, baseCutoff * (1.10 + filterMagnitude * 0.25)));
-        const releaseCutoff = Math.min(10000, Math.max(100, baseCutoff * 0.75));
-
-        if (selected === 'handsetSolace') {
-          filter.frequency.setValueAtTime(baseCutoff, now);
-        } else {
-          filter.frequency.setValueAtTime(startCutoff, now);
-          filter.frequency.exponentialRampToValueAtTime(valleyCutoff, now + Math.max(0.01, att + dec));
-          filter.frequency.exponentialRampToValueAtTime(sustainCutoff, now + Math.max(0.02, att + dec + sus));
-          filter.frequency.exponentialRampToValueAtTime(releaseCutoff, now + att + dec + sus + Math.min(3.0, rel));
-        }
-
-        if (impulseContext !== context || globalThis._nlReverbDirty) {
-          globalThis._nlReverbDirty = false;
-          const sec = T.reverbSec, len = Math.floor(context.sampleRate * sec);
-          impulseBuffer = context.createBuffer(2, len, context.sampleRate);
-          for (let ch = 0; ch < 2; ch++) {
-            const d = impulseBuffer.getChannelData(ch);
-            for (let i = 0; i < len; i++) {
-              const t = i / len;
-              d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, T.reverbDecayPow) * (1 + T.reverbEarlyBoost * Math.exp(-t * T.reverbEarlyRate));
+        // Cache musical notes; retain the event's fine pitch variation at playback.
+        const noteFrequency = 196 * 2 ** (Math.round(12 * Math.log2(layer[2] / 196)) / 12);
+        const playbackRate = useSampleCache ? layer[2] / noteFrequency : 1;
+        const parameters = [...layer];
+        if (useSampleCache) parameters[2] = noteFrequency;
+        const cacheKey = JSON.stringify([context.sampleRate, ...parameters]);
+        const remember = rawSamples => {
+          globalThis.netloomPerf?.event('samples',{bytes:rawSamples.byteLength});
+          const result = owner.createBuffer(1, rawSamples.length, owner.sampleRate);
+          result.getChannelData(0).set(rawSamples);
+          const bytes = result.length * 4;
+          if (useSampleCache && bytes <= 32 * 1024 * 1024) {
+            while (sampleCache.size && (sampleCacheBytes + bytes > 32 * 1024 * 1024 || sampleCache.size >= 128)) {
+              const oldest = sampleCache.keys().next().value;
+              sampleCacheBytes -= sampleCache.get(oldest).length * 4; sampleCache.delete(oldest);
             }
+            sampleCache.set(cacheKey, result); sampleCacheBytes += bytes;
           }
-          impulseContext = context;
-        }
-
-        convolver.buffer = impulseBuffer;
-        delay.delayTime.value = T.delayBase + (eventSeed % 7) * T.delayStep;
-        feedback.gain.value = T.feedbackBase + filterMagnitude * T.feedbackMagScale;
-        dry.gain.value = T.dryGain;
-        wet.gain.value = T.wetGain;
-
-        compressor.threshold.value = T.cmpThreshold;
-        compressor.knee.value = T.cmpKnee;
-        compressor.ratio.value = T.cmpRatio;
-        compressor.attack.value = T.cmpAttack;
-        compressor.release.value = T.cmpRelease;
-
-        if (!masterLimiter || masterLimiter.context !== context) {
-          masterLimiter = context.createDynamicsCompressor();
-          masterLimiter.threshold.setValueAtTime(-1.0, context.currentTime);
-          masterLimiter.knee.setValueAtTime(4.0, context.currentTime);
-          masterLimiter.ratio.setValueAtTime(20.0, context.currentTime);
-          masterLimiter.attack.setValueAtTime(0.001, context.currentTime);
-          masterLimiter.release.setValueAtTime(0.12, context.currentTime);
-
-          // Soft-knee waveshaper prevents digital DAC clipping
-          masterShaper = context.createWaveShaper();
-          const n = 4096, curve = new Float32Array(n);
-          for (let i = 0; i < n; i++) {
-            const x = (i * 2) / n - 1;
-            curve[i] = Math.tanh(x * 1.2) / Math.tanh(1.2);
-          }
-          masterShaper.curve = curve;
-          masterShaper.oversample = '2x';
-
-          masterLimiter.connect(masterShaper);
-          masterShaper.connect(masterGain);
-        }
-
-        // Strict audio graph routing: signal ONLY flows through filter, delay/reverb, compressor, limiter & soft-shaper
-        source.connect(gain);
-        gain.connect(filter);
-        filter.connect(dry);
-        dry.connect(compressor);
-        filter.connect(delay);
-        delay.connect(feedback);
-        feedback.connect(delay);
-        delay.connect(convolver);
-        convolver.connect(wet);
-        wet.connect(compressor);
-        compressor.connect(masterLimiter);
-
-        const fade = selected === 'signalLoom' ? 1 - index * 0.12 : 1;
-        const layerNorm = 1 / Math.sqrt(layers.length);
-        const targetGain = (T.gainMul * 0.22) * Math.max(0.35, Math.min(1.5, volume / 0.10)) * fade * layerNorm;
-
-        // Zero-click 5ms linear onset ramp from absolute 0 eliminates clicks at start
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(Math.max(0.0001, targetGain), now + 0.005);
-        source.start(now);globalThis.netloomPerf?.event('voiceStarted',{voices:voices.size});
-        voices.add(source);
-
-        // Allow full note release + reverb tail + delay feedback to ring out completely
-        const totalNoteDuration = att + dec + sus + rel;
-        const fullRingOut = totalNoteDuration + T.reverbSec + (T.feedbackBase > 0 ? 3.5 : 1.5);
-        const expiry = setTimeout(() => {
-          try { source.stop(); } catch {}
-          source.onended?.();
-        }, fullRingOut * 1000);
-
-        source.onended = () => {
-          clearTimeout(expiry);
-          voices.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size});
-          source.onended = null;
-          source.disconnect();
-          setTimeout(() => {
-            for (const node of [gain, filter, dry, delay, feedback, wet, convolver, compressor]) {
-              try { node.disconnect(); } catch {}
-            }
-          }, Math.max(1500, T.reverbSec * 1000 + 2000));
-          source.buffer = null;
+          return result;
         };
+        let cached = useSampleCache ? sampleCache.get(cacheKey) : null;
+        if (cached) {
+          sampleCache.delete(cacheKey); sampleCache.set(cacheKey, cached);
+          globalThis.netloomPerf?.event('sampleCacheHit');
+        }
+        const startVoice = buffer => {
+          if (context !== owner || generation !== synthesisGeneration || !enabled || owner.state !== 'running') return;
+          const source = context.createBufferSource();
+          source.buffer = buffer;
+          source.playbackRate.value = playbackRate;
+          const gain = context.createGain();
+          source.gainNode = gain;
+
+          const filter = context.createBiquadFilter();
+
+          // Resonant filter contour: "HO-oooOT" / "PA-wwwoaAo"
+          filter.type = T.filterType || 'lowpass';
+          filter.Q.value = T.filterQ;
+          const baseCutoff = T.filterCutoff || 450;
+          const now = context.currentTime;
+          const startCutoff = Math.min(16000, Math.max(300, baseCutoff * (2.4 + filterMagnitude * 0.6)));
+          const valleyCutoff = Math.min(12000, Math.max(120, baseCutoff * (0.85 + filterMagnitude * 0.15)));
+          const sustainCutoff = Math.min(14000, Math.max(160, baseCutoff * (1.10 + filterMagnitude * 0.25)));
+          const releaseCutoff = Math.min(10000, Math.max(100, baseCutoff * 0.75));
+
+          if (selected === 'handsetSolace') {
+            filter.frequency.setValueAtTime(baseCutoff, now);
+          } else {
+            filter.frequency.setValueAtTime(startCutoff, now);
+            filter.frequency.exponentialRampToValueAtTime(valleyCutoff, now + Math.max(0.01, att + dec));
+            filter.frequency.exponentialRampToValueAtTime(sustainCutoff, now + Math.max(0.02, att + dec + sus));
+            filter.frequency.exponentialRampToValueAtTime(releaseCutoff, now + att + dec + sus + Math.min(3.0, rel));
+          }
+
+          if (impulseContext !== context || globalThis._nlReverbDirty) {
+            globalThis._nlReverbDirty = false;
+            const sec = T.reverbSec, len = Math.floor(context.sampleRate * sec);
+            impulseBuffer = context.createBuffer(2, len, context.sampleRate);
+            for (let ch = 0; ch < 2; ch++) {
+              const d = impulseBuffer.getChannelData(ch);
+              for (let i = 0; i < len; i++) {
+                const t = i / len;
+                d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, T.reverbDecayPow) * (1 + T.reverbEarlyBoost * Math.exp(-t * T.reverbEarlyRate));
+              }
+            }
+            impulseContext = context;
+          }
+
+          if (!masterLimiter || masterLimiter.context !== context) {
+            masterLimiter = context.createDynamicsCompressor();
+            masterLimiter.threshold.setValueAtTime(-1.0, context.currentTime);
+            masterLimiter.knee.setValueAtTime(4.0, context.currentTime);
+            masterLimiter.ratio.setValueAtTime(20.0, context.currentTime);
+            masterLimiter.attack.setValueAtTime(0.001, context.currentTime);
+            masterLimiter.release.setValueAtTime(0.12, context.currentTime);
+
+            // Soft-knee waveshaper prevents digital DAC clipping
+            masterShaper = context.createWaveShaper();
+            const n = 4096, curve = new Float32Array(n);
+            for (let i = 0; i < n; i++) {
+              const x = (i * 2) / n - 1;
+              curve[i] = Math.tanh(x * 1.2) / Math.tanh(1.2);
+            }
+            masterShaper.curve = curve;
+            masterShaper.oversample = '2x';
+
+            masterLimiter.connect(masterShaper);
+            masterShaper.connect(masterGain);
+          }
+
+          let layerEffects=[];
+          source.connect(gain);gain.connect(filter);
+          if (useSharedEffects) {
+            const bus=sharedBus(T);
+            filter.connect(bus.dry);filter.connect(bus.delay);
+          } else {
+            const dry=context.createGain(),delay=context.createDelay(4),feedback=context.createGain(),wet=context.createGain(),convolver=context.createConvolver(),compressor=context.createDynamicsCompressor();
+          convolver.buffer = impulseBuffer;
+          delay.delayTime.value = T.delayBase + (eventSeed % 7) * T.delayStep;
+          feedback.gain.value = T.feedbackBase + filterMagnitude * T.feedbackMagScale;
+          dry.gain.value = T.dryGain;
+          wet.gain.value = T.wetGain;
+
+          compressor.threshold.value = T.cmpThreshold;
+          compressor.knee.value = T.cmpKnee;
+          compressor.ratio.value = T.cmpRatio;
+          compressor.attack.value = T.cmpAttack;
+          compressor.release.value = T.cmpRelease;
+
+            filter.connect(dry);dry.connect(compressor);filter.connect(delay);delay.connect(feedback);feedback.connect(delay);delay.connect(convolver);convolver.connect(wet);wet.connect(compressor);compressor.connect(masterLimiter);
+            layerEffects=[dry,delay,feedback,wet,convolver,compressor];
+          }
+
+          const fade = selected === 'signalLoom' ? 1 - index * 0.12 : 1;
+          const layerNorm = 1 / Math.sqrt(layers.length);
+          const targetGain = (T.gainMul * 0.22) * Math.max(0.35, Math.min(1.5, volume / 0.10)) * fade * layerNorm;
+
+          // Zero-click 5ms linear onset ramp from absolute 0 eliminates clicks at start
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(Math.max(0.0001, targetGain), now + 0.005);
+          source.start(now);globalThis.netloomPerf?.event('voiceStarted',{voices:voices.size});
+          voices.add(source);
+
+          // Allow full note release + reverb tail + delay feedback to ring out completely
+          const totalNoteDuration = att + dec + sus + rel;
+          const fullRingOut = totalNoteDuration + T.reverbSec + (T.feedbackBase > 0 ? 3.5 : 1.5);
+          const expiry = setTimeout(() => {
+            try { source.stop(); } catch {}
+            source.onended?.();
+          }, fullRingOut * 1000);
+
+          source.onended = () => {
+            clearTimeout(expiry);
+            voices.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size});
+            source.onended = null;
+            source.disconnect();
+            if (useSharedEffects) {
+              disconnectNodes([gain,filter]);scheduleSharedTail();
+            } else {
+              const nodes=[gain,filter,...layerEffects];
+              const timer=setTimeout(()=>{disconnectNodes(nodes);effectTails.delete(timer)},Math.max(1500,T.reverbSec*1000+2000));
+              effectTails.set(timer,nodes);
+            }
+            source.buffer = null;
+          };
+        };
+        if (cached) { startVoice(cached); return; }
+        globalThis.netloomPerf?.event('sampleCacheMiss');
+        if (!synthesisWorker || workerFailed) {
+          const samples = globalThis.netloomPerf ? netloomPerf.measure('synthesis',()=>buildSamplesFn(...parameters)) : buildSamplesFn(...parameters);
+          startVoice(remember(samples)); return;
+        }
+        const requested = performance.now();
+        let request = pendingSamples.get(cacheKey);
+        if (!request) {
+          request = synthesisWorker.generate(owner.sampleRate, parameters).then(({samples,duration}) => {
+            if (context !== owner || generation !== synthesisGeneration) return null;
+            globalThis.netloomPerf?.record('workerSynthesis',duration);
+            return remember(samples);
+          });
+          pendingSamples.set(cacheKey, request);
+          request.finally(() => { if (pendingSamples.get(cacheKey) === request) pendingSamples.delete(cacheKey); }).catch(()=>{});
+        } else globalThis.netloomPerf?.event('synthesisCoalesced');
+        preparingVoices++;
+        request.then(buffer => {
+          if (!buffer || context !== owner || generation !== synthesisGeneration || !enabled) return;
+          const latency = performance.now()-requested;
+          globalThis.netloomPerf?.record('synthesisLatency',latency);
+          if (latency > 1500) { globalThis.netloomPerf?.event('layerRejected',{reason:'stale'}); return; }
+          startVoice(buffer);
+        }).catch(error => {
+          if (generation === synthesisGeneration) {
+            globalThis.netloomPerf?.event('workerError',{message:String(error)});
+            if (error.message !== 'Synthesis queue full') workerFailed = true;
+          }
+        }).finally(() => { if (generation === synthesisGeneration) { preparingVoices--; scheduleSharedTail(); } });
       };
       for (let index = 0; index < layers.length; index++) {
         const delay = selected === 'signalLoom' ? index * 0.19 : 0;
@@ -518,5 +629,5 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     source.start();
     return true;
   }
-  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>({state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size})};
+  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>{let rms=null,peak=null;if(outputProbe){const samples=new Float32Array(outputProbe.fftSize);outputProbe.getFloatTimeDomainData(samples);rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);peak=samples.reduce((peak,x)=>Math.max(peak,Math.abs(x)),0)}return {rms,peak,state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size,preparing:preparingVoices,workerJobs:synthesisWorker?.pending||0,workerEnabled:!!synthesisWorker&&!workerFailed,workerActive:synthesisWorker?.active||false,effectsBuses:sharedEffects?1:0,effectTails:effectTails.size,cacheEntries:sampleCache.size,cacheBytes:sampleCacheBytes}}};
 }
