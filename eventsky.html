@@ -59,33 +59,16 @@
     const VIEW = 'eventsky';
     let laneOrder=[],lanePositions=new Map(),laneSortAt=0,laneFrameAt=0;
     const viewOptions = {reset:()=>{laneOrder=[];lanePositions.clear();laneSortAt=0;laneFrameAt=0}};
-    function draw(m,w,h){
-      const eligible=m.blocks.filter(b=>['send','receive','open'].includes(b.subtype));
-      const latestByAccount=new Map();
-      for(const b of eligible)latestByAccount.set(b.account,Math.max(latestByAccount.get(b.account)||-Infinity,b.at));
-      const laneLimit=w<600?10:24;
-      const allAccounts=[...latestByAccount.keys()],allAccountSet=new Set(allAccounts),partners=new Map(allAccounts.map(account=>[account,new Set()]));
-      for(const transfer of m.transfers){const from=transfer.send.account,to=transfer.send.destination;if(!partners.has(from)||!to)continue;partners.get(from).add(to);if(partners.has(to))partners.get(to).add(from)}
-      const now=performance.now(),previousRank=new Map(laneOrder.map((account,index)=>[account,index]));
-      laneOrder=laneOrder.filter(account=>allAccountSet.has(account));
-      if(!laneSortAt||now-laneSortAt>=10000){const rank=(a,b)=>(partners.get(b)?.size||0)-(partners.get(a)?.size||0)||(latestByAccount.get(b)||0)-(latestByAccount.get(a)||0)||(previousRank.get(a)??Infinity)-(previousRank.get(b)??Infinity),candidates=allAccounts.sort(rank).slice(0,laneLimit),candidateSet=new Set(candidates);laneOrder=laneOrder.filter(account=>candidateSet.has(account));for(const account of candidates)if(!laneOrder.includes(account))laneOrder.push(account);laneOrder.sort(rank);laneSortAt=now}
-      const accounts=laneOrder,activeAccounts=new Set(accounts);
-      const targets=new Map(laneOrder.map((account,index)=>[account,index])),blend=laneFrameAt?1-Math.exp(-Math.min(250,now-laneFrameAt)/700):1;laneFrameAt=now;
-      for(const account of accounts){const target=targets.get(account),current=lanePositions.get(account);lanePositions.set(account,current===undefined?target:current+(target-current)*blend)}
-      for(const account of [...lanePositions.keys()])if(!activeAccounts.has(account))lanePositions.delete(account);
-      const laneIndex=lanePositions,left=Math.max(92,w<600?82:128),right=w-34,top=Math.max(155,h*.22),bottom=Math.max(top+Math.min(180,h*.28),h-195),laneHeight=(bottom-top)/Math.max(1,accounts.length);
-      const start=state.time-state.windowMs,x=at=>left+Math.max(0,Math.min(1,(at-start)/state.windowMs))*(right-left),y=account=>top+(laneIndex.get(account)+.5)*laneHeight;
-      const byAccount=new Map();
-      for(const b of eligible)if(laneIndex.has(b.account)){const list=byAccount.get(b.account)||[];list.push(b);byAccount.set(b.account,list)}
+    function drawTimeAxis(left,right,top,bottom){
       for(let tick=0;tick<=6;tick++){
         const px=left+(right-left)*tick/6;line(px,top-15,px,bottom,`rgba(190,174,220,${tick===6?.22:.1})`,1);
         const elapsed=state.windowMs*(1-tick/6),label=elapsed>=60000?Math.round(elapsed/60000)+'m':Math.round(elapsed/1000)+'s';text(tick===6?'NOW':'−'+label,px,top-25,colors.muted,9,'center');
       }
-      for(const account of accounts){const py=y(account);line(left,py,right,py,'rgba(190,174,220,.11)',1);text(short(account),left-12,py+3,colors.muted,w<600?8:9,'right')}
-      // Absolute-time buckets keep the visible path sample stable as new sends arrive.
-      const pathInterval=state.windowMs/180,pathsByInterval=new Map();
-      for(const transfer of m.transfers){const interval=Math.floor(transfer.send.at/pathInterval);if(!pathsByInterval.has(interval))pathsByInterval.set(interval,transfer)}
-      const transfers=[...pathsByInterval.values()];
+    }
+    function drawAccountLanes(accounts,laneIndex,left,right,y,mobile){
+      for(const account of accounts){const py=y(account);line(left,py,right,py,'rgba(190,174,220,.11)',1);text(short(account),left-12,py+3,colors.muted,mobile?8:9,'right')}
+    }
+    function drawTransferPaths(transfers,laneIndex,x,y,right){
       for(const transfer of transfers){
         const send=transfer.send,receive=transfer.receive;if(!laneIndex.has(send.account)||!send.destination||!laneIndex.has(send.destination))continue;
         const sx=x(send.at),sy=y(send.account),ex=receive?x(receive.at):Math.min(right,sx+12),ey=receive?y(receive.account):y(send.destination);
@@ -94,15 +77,44 @@
         ctx.save();ctx.strokeStyle=receive?colors.receive:colors.send;ctx.globalAlpha=.12+recency*.3;ctx.lineWidth=.7+Math.min(3.5,Math.max(0,(logAmount(send.raw)+5)/7));ctx.setLineDash(receive?[]:[3,6]);ctx.beginPath();ctx.moveTo(sx,sy);ctx.bezierCurveTo(sx+(ex-sx)*.55,sy,ex-(ex-sx)*.3,ey,ex,ey);ctx.stroke();ctx.setLineDash([]);ctx.restore();
         if(receive){const age=state.time-receive.at;if(!reducedMotion&&age>=0&&age<1000){const p=age/1000,q=1-p;dot(q*q*q*sx+3*q*q*p*(sx+(ex-sx)*.55)+3*q*p*p*(ex-(ex-sx)*.3)+p*p*p*ex,q*q*q*sy+3*q*q*p*sy+3*q*p*p*ey+p*p*p*ey,3.2,colors.receive,true)}}
       }
+    }
+    function drawAccountEvents(accounts,byAccount,laneIndex,x,y,m){
       for(const account of accounts){
         const events=(byAccount.get(account)||[]).sort((a,b)=>a.at-b.at),chainCount=Math.min(72,events.length),chain=chainCount===events.length?events:Array.from({length:chainCount},(_,i)=>events[Math.floor(i*(events.length-1)/(chainCount-1))]),py=y(account);
         for(let i=0;i<chain.length;i++){
-          const block=chain[i],px=x(block.at),previous=m.byHash.get(block.previous);
-          const siblingRecency=chain.length<=1?1:i/(chain.length-1),traceAlpha=.14+siblingRecency*.76;
+          const block=chain[i],px=x(block.at),previous=m.byHash.get(block.previous),siblingRecency=chain.length<=1?1:i/(chain.length-1);
           if(previous&&previous.account===account&&laneIndex.has(previous.account)){ctx.save();ctx.globalAlpha=.18+siblingRecency*.42;line(x(previous.at),py,px,py,'rgba(163,157,197,.42)',1.1);ctx.restore()}
-          const magnitude=logAmount(block.raw),radius=Math.max(2.2,Math.min(8.2,2.2+(magnitude+8)*.2));mark(block,px,py,radius,'eventsky-event',true,traceAlpha);
+          const magnitude=logAmount(block.raw),radius=Math.max(2.2,Math.min(8.2,2.2+(magnitude+8)*.2));mark(block,px,py,radius,'eventsky-event',true,.14+siblingRecency*.76);
         }
       }
+    }
+    function draw(m,w,h){
+      const eligible=m.blocks.filter(b=>['send','receive','open'].includes(b.subtype));
+      const latestByAccount=new Map();
+      for(const b of eligible)latestByAccount.set(b.account,Math.max(latestByAccount.get(b.account)||-Infinity,b.at));
+      const laneLimit=w<600?10:24;
+      const allAccounts=[...latestByAccount.keys()],allAccountSet=new Set(allAccounts);
+      const now=performance.now();
+      laneOrder=laneOrder.filter(account=>allAccountSet.has(account));
+      if(!laneSortAt||now-laneSortAt>=10000){
+      const partners=new Map(allAccounts.map(account=>[account,new Set()])),previousRank=new Map(laneOrder.map((account,index)=>[account,index]));
+      for(const transfer of m.transfers){const from=transfer.send.account,to=transfer.send.destination;if(!partners.has(from)||!to)continue;partners.get(from).add(to);if(partners.has(to))partners.get(to).add(from)}
+      const rank=(a,b)=>(partners.get(b)?.size||0)-(partners.get(a)?.size||0)||(latestByAccount.get(b)||0)-(latestByAccount.get(a)||0)||(previousRank.get(a)??Infinity)-(previousRank.get(b)??Infinity),candidates=allAccounts.sort(rank).slice(0,laneLimit),candidateSet=new Set(candidates);laneOrder=laneOrder.filter(account=>candidateSet.has(account));for(const account of candidates)if(!laneOrder.includes(account))laneOrder.push(account);laneOrder.sort(rank);laneSortAt=now}
+      const accounts=laneOrder,activeAccounts=new Set(accounts);
+      const blend=laneFrameAt?1-Math.exp(-Math.min(250,now-laneFrameAt)/700):1;laneFrameAt=now;
+      for(const [target,account] of accounts.entries()){const current=lanePositions.get(account);lanePositions.set(account,current===undefined?target:current+(target-current)*blend)}
+      for(const account of [...lanePositions.keys()])if(!activeAccounts.has(account))lanePositions.delete(account);
+      const laneIndex=lanePositions,left=Math.max(92,w<600?82:128),right=w-34,top=Math.max(155,h*.22),bottom=Math.max(top+Math.min(180,h*.28),h-195),laneHeight=(bottom-top)/Math.max(1,accounts.length);
+      const start=state.time-state.windowMs,x=at=>left+Math.max(0,Math.min(1,(at-start)/state.windowMs))*(right-left),y=account=>top+(laneIndex.get(account)+.5)*laneHeight;
+      const byAccount=new Map();
+      for(const b of eligible)if(laneIndex.has(b.account)){const list=byAccount.get(b.account)||[];list.push(b);byAccount.set(b.account,list)}
+      drawTimeAxis(left,right,top,bottom);
+      drawAccountLanes(accounts,laneIndex,left,right,y,w<600);
+      // Absolute-time buckets keep the visible path sample stable as new sends arrive.
+      const pathInterval=state.windowMs/180,pathsByInterval=new Map();
+      for(const transfer of m.transfers){const interval=Math.floor(transfer.send.at/pathInterval);if(!pathsByInterval.has(interval))pathsByInterval.set(interval,transfer)}
+      drawTransferPaths([...pathsByInterval.values()],laneIndex,x,y,right);
+      drawAccountEvents(accounts,byAccount,laneIndex,x,y,m);
       text('CONNECTED ACCOUNTS · TOP  /  10S',left,top-8,colors.receive,9);text('XNO AMOUNT',right,bottom+28,colors.send,9,'right');
       text('TIME →',left,bottom+28,colors.muted,9);
       if(!eligible.length)empty(w,h,'Waiting for confirmed send and receive events');

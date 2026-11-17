@@ -2,6 +2,9 @@
 'use strict';
 let feedClient = null;
 const state = { mode:'live', time:0, windowMs:globalThis.gallerySettings?.memoryMs||30*60000, playing:true, blocks:[], votes:[], recording:[], seen:new Set(), selected:null, selectedAccount:null, accountOrder:new Map(), status:'', started:0, demoIndex:0 };
+// Retained history owns data; frame-local animation must not mutate cached indexes.
+/** @typedef {{hash:string, account:string, at:number, raw:string, subtype:string}} NormalizedBlock */
+let dataRevision=0, cachedModel=null;
 const demo = [];
 const names = ['Atlas','Birch','Cedar','Delta','Ember','Fern','Grove','Harbor','Iris','Juniper','Kite','Lumen'];
 for (let i=0; i<1200; i++) {
@@ -30,6 +33,7 @@ function rememberAccount(account) {
   if(account&&!state.accountOrder.has(account))state.accountOrder.set(account,state.accountOrder.size);
 }
 function ingest(event, at, lastSeenAt = Date.now(), persist = false) {
+  dataRevision++;
   appendBounded(state.recording,{observedAt:at,topic:event.topic,message:event.message},10000);
   const m=event.message||{};
   if(event.topic==='vote'&&typeof m.account==='string') {
@@ -51,6 +55,7 @@ function ingest(event, at, lastSeenAt = Date.now(), persist = false) {
   rememberBlock(block);
 }
 function rememberBlock(block){
+  dataRevision++;
   state.seen.add(block.hash);state.blocks.push(block);rememberAccount(block.account);
   if(block.subtype==='send')rememberAccount(block.destination);
   if(state.blocks.length>3000)state.seen.delete(state.blocks.shift().hash);
@@ -58,7 +63,7 @@ function rememberBlock(block){
   if(state.accountOrder.size>6000){const retained=new Set(state.blocks.flatMap(b=>[b.account,b.destination]).filter(Boolean));state.accountOrder=new Map([...state.accountOrder].filter(([a])=>retained.has(a)));}
 }
 function advanceDemo(){if(!['demo','stress'].includes(state.mode))return;while(state.demoIndex<demo.length&&demo[state.demoIndex].at<=state.time){const event=demo[state.demoIndex++];ingest(event,event.at)}}
-function clearRecording(){viewOptions.reset?.();visualItems.clear();state.blocks=[];state.votes=[];state.recording=[];state.seen.clear();state.accountOrder.clear();state.selected=null;state.selectedAccount=null;state.demoIndex=0;state.time=0;}
+function clearRecording(){dataRevision++;cachedModel=null;viewOptions.reset?.();visualItems.clear();state.blocks=[];state.votes=[];state.recording=[];state.seen.clear();state.accountOrder.clear();state.selected=null;state.selectedAccount=null;state.demoIndex=0;state.time=0;}
 function disconnect(){feedClient?.stop();feedClient=null}
 function startDemo(stress=false){disconnect();clearRecording();state.mode=stress?'stress':'demo';state.time=stress?0:VIEW==='eventsky'?25*60*1000:14000;state.playing=true;state.status=stress?'Stress test · fictional activity':'Simulated data';advanceDemo();render();}
 function connectSelected(){
@@ -82,9 +87,16 @@ const amount = formatNanoAmount;
 function logAmount(raw){try{const s=BigInt(raw).toString();if(s==='0')return -8;return s.length-1-30+Math.log10(Number(s.slice(0,12))/10**(Math.min(s.length,12)-1))}catch{return -8}}
 function seconds(ms){return (ms/1000).toFixed(ms<10000?1:0)+'s'}
 function model(){
- const blocks=state.blocks.filter(b=>b.at<=state.time&&b.at>=state.time-state.windowMs),byHash=new Map(blocks.map(b=>[b.hash,b]));
- const receives=new Map(blocks.filter(b=>['receive','open'].includes(b.subtype)).map(b=>[b.source,b]));
- const transfers=blocks.filter(b=>b.subtype==='send').map(send=>({send,receive:receives.get(send.hash)}));
+ const reusable=cachedModel&&cachedModel.revision===dataRevision&&cachedModel.windowMs===state.windowMs&&state.time>=cachedModel.time&&state.time<cachedModel.nextChange;
+ if(!reusable){
+  const blocks=state.blocks.filter(b=>b.at<=state.time&&b.at>=state.time-state.windowMs),byHash=new Map(blocks.map(b=>[b.hash,b]));
+  const receives=new Map(blocks.filter(b=>['receive','open'].includes(b.subtype)).map(b=>[b.source,b]));
+  const transfers=blocks.filter(b=>b.subtype==='send').map(send=>({send,receive:receives.get(send.hash)}));
+  let nextChange=Infinity;
+  for(const b of state.blocks){if(b.at>state.time)nextChange=Math.min(nextChange,b.at);else if(b.at+state.windowMs>=state.time)nextChange=Math.min(nextChange,b.at+state.windowMs)}
+  cachedModel={revision:dataRevision,windowMs:state.windowMs,time:state.time,nextChange,blocks,byHash,receives,transfers};
+ }
+ const {blocks,byHash,receives,transfers}=cachedModel;
  const votes=state.votes.filter(v=>v.at<=state.time&&v.at>=state.time-state.windowMs),recent=blocks.filter(b=>b.at>=state.time-60000),votePulses=new Map();
  for(const vote of votes)if(vote.at>state.time-900)for(const hash of vote.hashes)votePulses.set(hash,Math.max(votePulses.get(hash)||0,vote.at));
  return {blocks,byHash,receives,transfers,votes,recent,votePulses};

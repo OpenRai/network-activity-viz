@@ -37,3 +37,17 @@ test('the core excludes expired and future blocks from replay-window models',()=
  vm.runInContext('state.time=60000;state.windowMs=10000',c);
  expect(c.model().blocks.map(b=>b.hash)).toEqual(['RECENT']);
 });
+
+test('model indexes reuse quiet history and invalidate for time boundaries and duplicate metadata',()=>{
+ const c=harness();
+ c.ingest({topic:'confirmation',message:{hash:'A',account:'nano_a',amount:'1',block:{subtype:'send'}}},50);
+ vm.runInContext('state.time=60;state.windowMs=100',c);
+ const first=c.model();vm.runInContext('state.time=70',c);expect(c.model().byHash).toBe(first.byHash);
+ c.ingest({topic:'confirmation',message:{hash:'A',account:'nano_a',block:{subtype:'send'}}},50,123);
+ expect(c.model().byHash).not.toBe(first.byHash);
+ vm.runInContext('state.time=150',c);expect(c.model().blocks).toHaveLength(1);
+ vm.runInContext('state.time=151',c);expect(c.model().blocks).toHaveLength(0);
+ vm.runInContext('state.time=60',c);expect(c.model().blocks).toHaveLength(1);
+ vm.runInContext('state.time=40',c);expect(c.model().blocks).toHaveLength(0);
+ vm.runInContext('state.time=50',c);expect(c.model().blocks).toHaveLength(1);
+});
