@@ -3,15 +3,15 @@
   const node = document.querySelector('#feed');
   if (!node) return;
   const hosts = [
-    ['wss://ws.nano.to', 'Nano.to'],
     ['wss://node.somenano.com/repeater', 'SomeNano network repeater'],
+    ['wss://ws.nano.to', 'Nano.to'],
     ['demo', 'Simulated data'],
     ['stress', 'Stress test · 30×']
   ];
   let stored;
   try { stored = localStorage.getItem('nano-gallery-node'); } catch {}
   node.replaceChildren(...hosts.map(([value, label]) => new Option(label, value)));
-  node.value = hosts.slice(0, 2).some(([value]) => value === stored) ? stored : hosts[0][0];
+  node.value = hosts.slice(0, 2).some(([value]) => value === stored) ? stored : 'wss://node.somenano.com/repeater';
   node.setAttribute('aria-label', 'Node');
   let nodeLabel = node.closest('label');
   if (!nodeLabel) {

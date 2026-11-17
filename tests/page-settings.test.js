@@ -11,7 +11,7 @@ function settings(stored){
  return node.value;
 }
 for(const stored of [null,'demo','stress','invalid'])test('startup uses a live node when saved choice is '+stored,()=>{
- expect(settings(stored)).toBe('wss://ws.nano.to');
+ expect(settings(stored)).toBe('wss://node.somenano.com/repeater');
 });
 test('a saved live repeater remains selectable',()=>{
  expect(settings('wss://node.somenano.com/repeater')).toBe('wss://node.somenano.com/repeater');
