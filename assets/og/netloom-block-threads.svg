@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<defs>
+ <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#030713"/><stop offset=".55" stop-color="#07172a"/><stop offset="1" stop-color="#110d2b"/></linearGradient>
+ <linearGradient id="thread" x2="1"><stop stop-color="#08e2cf"/><stop offset=".52" stop-color="#16a9ff"/><stop offset="1" stop-color="#ff9a54"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#0b94b4" stop-opacity=".25"/><stop offset="1" stop-color="#071020" stop-opacity="0"/></radialGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="12"/></filter>
+</defs>
+<rect width="1200" height="630" fill="url(#bg)"/><ellipse cx="760" cy="300" rx="520" ry="360" fill="url(#glow)"/>
+<g opacity=".2" stroke="#28728c" stroke-width="1">
+ <path d="M0 390 1200 105M0 450 1200 165M0 510 1200 225M0 570 1200 285M120 630 1200 375M0 330 1100 60"/>
+ <path d="M430 180v450M520 140v490M610 100v530M700 60v570M790 30v600M880 20v610M970 15v615M1060 10v620"/>
+</g>
+<g fill="none" stroke="url(#thread)" stroke-linecap="round">
+ <path d="M430 383 C530 340 555 220 655 238 S765 414 860 357 970 183 1085 218" stroke-width="5" opacity=".22" filter="url(#blur)"/>
+ <path d="M430 383 C530 340 555 220 655 238 S765 414 860 357 970 183 1085 218" stroke-width="2.4"/>
+ <path d="M455 488 C540 448 575 300 660 296 S775 490 875 445 980 280 1090 310" stroke-width="2" opacity=".8"/>
+ <path d="M490 274 C570 316 585 455 687 455 S795 265 890 274 990 412 1098 420" stroke-width="1.7" opacity=".65"/>
+ <path d="M550 150 C615 190 630 362 720 372 S830 168 920 170 1015 332 1100 342" stroke-width="1.4" opacity=".55"/>
+</g>
+<g fill="#07192b" stroke="url(#thread)" stroke-width="2">
+ <rect x="420" y="370" width="24" height="24" rx="3"/><rect x="645" y="226" width="24" height="24" rx="3"/><rect x="850" y="345" width="24" height="24" rx="3"/><rect x="1075" y="206" width="24" height="24" rx="3"/>
+ <circle cx="520" cy="461" r="7"/><circle cx="688" cy="455" r="7"/><circle cx="890" cy="274" r="7"/><circle cx="1098" cy="420" r="7"/>
+</g>
+<g fill="#83aabe" font-family="monospace" font-size="13" opacity=".8">
+ <text x="401" y="355">SEND / HASH 9F2…A17</text><text x="635" y="209">RECEIVE / 0.42 XNO</text><text x="842" y="329">BLOCK 7CA…D04</text><text x="1010" y="190">NOW · LIVE</text>
+</g>
+<path d="M0 0h1200v10H0z" fill="url(#thread)" opacity=".8"/>
+<g font-family="Arial,Helvetica,sans-serif">
+ <text x="64" y="92" fill="#5ce6d1" font-size="17" font-weight="700" letter-spacing="5">NANO IN MOTION  /  LIVE NETWORK</text>
+ <text x="60" y="420" fill="#f0f6ff" font-size="68" font-weight="700" letter-spacing="-2">NetLoom</text>
+ <text x="64" y="466" fill="#b6d4e5" font-size="27" font-weight="500">Block Threads</text>
+ <text x="66" y="520" fill="#7e9cae" font-family="monospace" font-size="15" letter-spacing="2">CONFIRMED BLOCKS · TRANSFERS · AMOUNT</text>
+</g>
+</svg>

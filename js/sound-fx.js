@@ -143,7 +143,10 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
   }
   function setVolumeMultiplier(value) {
-    volumeMultiplier = Math.max(.5, Math.min(1.5, Number(value) || 1));
+    const percent = Math.max(50, Math.min(150, (Number(value) || 1) * 100));
+    const perceivedLoudness = Math.pow(percent / 100, 1.65);
+    const calibration = profile === 'cyber' ? .52 : 2.0;
+    volumeMultiplier = calibration * perceivedLoudness;
     if (context && masterGain) masterGain.gain.setTargetAtTime(volumeMultiplier, context.currentTime, .015);
   }
   function play({frequency = 440, volume = 0.15, duration, outside = false, account = '', amount = 0.001, subtype = 'send', at = Date.now(), hash = '', lfoDepth = profile === 'alien' ? .24 : .12} = {}) {
