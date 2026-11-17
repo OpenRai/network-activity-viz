@@ -10,7 +10,9 @@ function harness(fail=false,profile='ethereal',workerMode=false){
   async resume(){this.resumes=(this.resumes||0)+1;if(this.resumeHook)return this.resumeHook();if(fail)throw Error('Audio blocked');this.state='running'}
   async close(){this.state='closed';this.closed=true}
   createBuffer(channels,length){const samples=new Float32Array(length);buffers.push(samples);return{length,sampleRate:48000,getChannelData:()=>samples}}
-  createBufferSource(){const voice={playbackRate:{value:1},connect(){},disconnect(){this.disconnected=true},start(){this.started=true},stop(){this.stopped=true;this.onended?.()}};voices.push(voice);return voice}
+  createBufferSource(){const owner=this;const voice={playbackRate:{value:1},connect(){},disconnect(){this.disconnected=true},start(when){this.started=true;this.startedAt=when},stop(when){this.stopped=true;if(when===undefined||when<=owner.currentTime)this.onended?.()}};voices.push(voice);return voice}
+  createOscillator(){const voice=this.createBufferSource();voice.frequency={value:440};voice.setPeriodicWave=()=>{};return voice}
+  createPeriodicWave(){return {}}
   createBiquadFilter(){return this.effect(['frequency','Q'])}
   createDelay(){return this.effect(['delayTime'])}
   createConvolver(){const node=this.effect([]);convolvers.push(node);return node}
@@ -116,8 +118,8 @@ test('NetLoom presets synthesize finite pitched buffers through ZzFX',async()=>{
   const h=harness(false,'cyber');await h.fx.enable();h.fx.setSoundSet(preset);
   expect(h.fx.play({frequency:440,amount:1,account:'nano_test',hash:'A',subtype:'send'})).toBe(true);
   expect(h.voices.length).toBeGreaterThan(0);
-  for(const voice of h.voices){const data=voice.buffer.getChannelData(0);expect(data.every(Number.isFinite)).toBe(true);expect(data.some(x=>Math.abs(x)>.01)).toBe(true)}
-  h.fx.dispose();expect(h.voices.every(v=>v.buffer===null)).toBe(true);expect(h.fx.diagnostics().scheduled).toBe(0);
+  for(const voice of h.voices){if(voice.frequency){expect(Number.isFinite(voice.frequency.value)).toBe(true);continue}const data=voice.buffer.getChannelData(0);expect(data.every(Number.isFinite)).toBe(true);expect(data.some(x=>Math.abs(x)>.01)).toBe(true)}
+  h.fx.dispose();expect(h.voices.every(v=>v.frequency||v.buffer===null)).toBe(true);expect(h.fx.diagnostics().scheduled).toBe(0);
  }
 });
 test('ordinary background visibility preserves the audio context',async()=>{
@@ -174,4 +176,18 @@ test('a worker failure allows the existing foreground generator to recover on th
  for(const job of h.asyncJobs.splice(0))job.reject(new Error('Worker failed'));
  await new Promise(resolve=>setTimeout(resolve,0));expect(h.fx.diagnostics().preparing).toBe(0);
  expect(h.fx.play({frequency:440})).toBe(true);expect(h.voices).toHaveLength(3);expect(h.asyncJobs).toHaveLength(0);h.fx.dispose();
+});
+
+test('adaptive NetLoom allocation retains fresh fundamentals and bounds retiring voices',async()=>{
+ const h=harness(false,'cyber');await h.fx.enable();h.fx.setSoundSet('neonPulse');
+ for(let i=0;i<40;i++)h.fx.play({frequency:440,amount:1,hash:String(i)});
+ const d=h.fx.diagnostics();expect(d.voices).toBeLessThanOrEqual(28);expect(d.retiring).toBeLessThanOrEqual(4);expect(d.voices+d.retiring).toBeLessThanOrEqual(32);
+ expect(d.retiring).toBeGreaterThan(0);h.fx.dispose();expect(h.fx.diagnostics().retiring).toBe(0);
+});
+
+test('Signal Loom schedules its staggered notes on the audio clock without timer slots',async()=>{
+ const h=harness(false,'cyber');await h.fx.enable();h.fx.setSoundSet('signalLoom');h.fx.play({frequency:440});
+ expect(h.voices).toHaveLength(4);expect(h.fx.diagnostics().scheduled).toBe(0);
+ for(let i=1;i<4;i++)expect(h.voices[i].startedAt-h.voices[0].startedAt).toBeCloseTo(i*.19,5);
+ h.fx.disable();expect(h.voices.every(v=>v.stopped)).toBe(true);
 });

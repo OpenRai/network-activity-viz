@@ -5,6 +5,25 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
   const wasmBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 125, 1, 125, 3, 2, 1, 0, 7, 10, 1, 6, 115, 97, 109, 112, 108, 101, 0, 0, 10, 52, 1, 50, 1, 1, 125, 67, 0, 0, 128, 63, 67, 0, 0, 128, 64, 32, 0, 67, 0, 0, 0, 63, 147, 139, 148, 147, 33, 1, 67, 0, 0, 192, 63, 32, 1, 148, 67, 0, 0, 0, 63, 32, 1, 32, 1, 32, 1, 148, 148, 148, 147, 11]);
   let context = null, oscillator = null, enabled = false;
   const voices = new Set();
+  const voiceDetails = new Map(), retiringVoices = new Set();
+  const adaptivePolyphony = profile === 'cyber' && !(globalThis.netloomPerf && new URLSearchParams(location.search).get('voicePolicy') === '0');
+  function voiceSlot(priority) {
+    if (voices.size + preparingVoices < 28) return true;
+    if (!adaptivePolyphony || retiringVoices.size >= 4) return false;
+    const now = context.currentTime;
+    const candidates = [...voiceDetails.entries()].filter(([voice,detail]) => voices.has(voice) && (detail.priority < priority || now-detail.started > .25));
+    candidates.sort((a,b) => a[1].priority-b[1].priority || a[1].started-b[1].started);
+    const candidate=candidates[0];
+    if (!candidate || candidate[1].priority>priority) return false;
+    const [voice,detail]=candidate;
+    try {
+      if(detail.gain.gain.cancelAndHoldAtTime)detail.gain.gain.cancelAndHoldAtTime(now);
+      else { detail.gain.gain.cancelScheduledValues?.(now);detail.gain.gain.setValueAtTime(detail.gain.gain.value,now); }
+      detail.gain.gain.linearRampToValueAtTime(0,now+.02);voice.stop(now+.02);
+      voices.delete(voice);retiringVoices.add(voice);
+      globalThis.netloomPerf?.event('voiceStolen');return voices.size+preparingVoices<28;
+    } catch {return false;}
+  }
   const sampleCache = new Map();
   let sampleCacheBytes = 0;
   const useSampleCache = !(globalThis.netloomPerf && new URLSearchParams(location.search).get('sampleCache') === '0');
@@ -14,6 +33,8 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
   const synthesisWorker = workerSynthesis ? createZzfxWorkerClient() : null;
   const pendingSamples = new Map();
   let synthesisGeneration = 0, preparingVoices = 0, workerFailed = false;
+  const nativeSustain = !(globalThis.netloomPerf && new URLSearchParams(location.search).get('nativeSustain') === '0');
+  const audioClockSchedule = !(globalThis.netloomPerf && new URLSearchParams(location.search).get('audioClock') === '0');
   const useSharedEffects = !(globalThis.netloomPerf && new URLSearchParams(location.search).get('sharedEffects') === '0');
   let sharedEffects = null, sharedTailTimer = null;
   const effectTails = new Map();
@@ -81,7 +102,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     synthesisGeneration++; preparingVoices = 0;
     synthesisWorker?.cancelAll(); pendingSamples.clear();
     for(const timer of scheduledVoices)clearTimeout(timer);scheduledVoices.clear();
-    for (const voice of [...voices]) {
+    for (const voice of new Set([...voices,...retiringVoices])) {
       try { voice.stop(); } catch {}
       voice.onended?.();
     }
@@ -211,7 +232,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       recover();
       return false;
     }
-    if (voices.size >= (profile === 'cyber' && backend === 'zzfx' ? 28 : 12)) {globalThis.netloomPerf?.event('soundRejected',{reason:'capacity',voices:voices.size});return false;}
+    if (!adaptivePolyphony && voices.size >= (profile === 'cyber' && backend === 'zzfx' ? 28 : 12)) {globalThis.netloomPerf?.event('soundRejected',{reason:'capacity',voices:voices.size});return false;}
     const preset = sets[selected];
     const magnitude = Math.max(0, Math.min(1, (Math.log10(Math.max(1e-30, amount)) + 5) / 10));
     const eventTone = subtype === 'send' ? 1 : subtype === 'open' ? 1.12 : .92;
@@ -307,12 +328,16 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
         handsetSolace: [0],
       };
       const allLayers = patterns[selected] || [0];
-      const layers = allLayers;
+      const pressure=voices.size+preparingVoices;
+      const layers = adaptivePolyphony ? allLayers.slice(0,pressure>=24?1:pressure>=18?2:allLayers.length) : allLayers;
+      if(layers.length<allLayers.length)globalThis.netloomPerf?.event('harmonicsReduced',{count:allLayers.length-layers.length});
+      const nativeVoice=nativeSustain&&selected==='signalLoom'&&typeof context.createOscillator==='function';
       const filterMagnitude = selected === 'handsetSolace' ? 0.5 : magnitude;
       const owner = context, generation = synthesisGeneration;
+      const sequenceStart=owner.currentTime+(audioClockSchedule?.12:0);
       const launchLayer = index => {
         if (context !== owner || generation !== synthesisGeneration || !enabled) return;
-        if (voices.size + preparingVoices >= 28) { globalThis.netloomPerf?.event('layerRejected',{reason:'capacity'}); return; }
+        if (!voiceSlot(index===0?2:1)) { globalThis.netloomPerf?.event('layerRejected',{reason:'capacity'}); return; }
         const degree = layers[index], layer = [...z], direction = subtype === 'receive' ? -1 : 1;
         // Fundamental is loudest; higher harmonics support naturally without tinny squeaks
         const layerVol = (index === 0 ? 1.0 : 0.65 / Math.sqrt(index)) * T.layerVolBase;
@@ -351,9 +376,12 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
         }
         const startVoice = buffer => {
           if (context !== owner || generation !== synthesisGeneration || !enabled || owner.state !== 'running') return;
-          const source = context.createBufferSource();
-          source.buffer = buffer;
-          source.playbackRate.value = playbackRate;
+          const source = nativeVoice ? context.createOscillator() : context.createBufferSource();
+          if(nativeVoice){
+            const real=new Float32Array(5),imag=new Float32Array([0,1,.18+magnitude*.12,.12,.05]);
+            source.setPeriodicWave(context.createPeriodicWave(real,imag));source.frequency.value=layer[2];
+            globalThis.netloomPerf?.event('nativeVoice');
+          }else{source.buffer=buffer;source.playbackRate.value=playbackRate}
           const gain = context.createGain();
           source.gainNode = gain;
 
@@ -363,7 +391,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
           filter.type = T.filterType || 'lowpass';
           filter.Q.value = T.filterQ;
           const baseCutoff = T.filterCutoff || 450;
-          const now = context.currentTime;
+          const planned=selected==='signalLoom'?sequenceStart+index*.19:context.currentTime;
+          const now=audioClockSchedule?Math.max(context.currentTime+.005,planned):context.currentTime+.005;
+          if(selected==='signalLoom')globalThis.netloomPerf?.record('arpeggioLatenessMs',Math.max(0,now-planned)*1000);
           const startCutoff = Math.min(16000, Math.max(300, baseCutoff * (2.4 + filterMagnitude * 0.6)));
           const valleyCutoff = Math.min(12000, Math.max(120, baseCutoff * (0.85 + filterMagnitude * 0.15)));
           const sustainCutoff = Math.min(14000, Math.max(160, baseCutoff * (1.10 + filterMagnitude * 0.25)));
@@ -438,14 +468,21 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
           }
 
           const fade = selected === 'signalLoom' ? 1 - index * 0.12 : 1;
-          const layerNorm = 1 / Math.sqrt(layers.length);
+          const layerNorm = 1 / Math.sqrt(allLayers.length);
           const targetGain = (T.gainMul * 0.22) * Math.max(0.35, Math.min(1.5, volume / 0.10)) * fade * layerNorm;
 
           // Zero-click 5ms linear onset ramp from absolute 0 eliminates clicks at start
           gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(Math.max(0.0001, targetGain), now + 0.005);
-          source.start(now);globalThis.netloomPerf?.event('voiceStarted',{voices:voices.size});
-          voices.add(source);
+          if(nativeVoice){
+            const peak=targetGain*layer[0];
+            gain.gain.linearRampToValueAtTime(peak,now+Math.max(.005,att));
+            gain.gain.linearRampToValueAtTime(peak*sVol,now+att+dec);
+            gain.gain.setValueAtTime(peak*sVol,now+att+dec+sus);
+            gain.gain.linearRampToValueAtTime(0,now+att+dec+sus+rel);
+          }else gain.gain.linearRampToValueAtTime(Math.max(0.0001, targetGain), now + 0.005);
+          source.start(now);if(nativeVoice)source.stop(now+att+dec+sus+rel+.005);globalThis.netloomPerf?.event('voiceStarted',{voices:voices.size});
+          voices.add(source);voiceDetails.set(source,{priority:index===0?2:1,started:now,gain});
+          if(index===0)globalThis.netloomPerf?.event('eventVoiced');
 
           // Allow full note release + reverb tail + delay feedback to ring out completely
           const totalNoteDuration = att + dec + sus + rel;
@@ -453,11 +490,11 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
           const expiry = setTimeout(() => {
             try { source.stop(); } catch {}
             source.onended?.();
-          }, fullRingOut * 1000);
+          }, (fullRingOut+Math.max(0,now-context.currentTime)) * 1000);
 
           source.onended = () => {
             clearTimeout(expiry);
-            voices.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size});
+            voices.delete(source);retiringVoices.delete(source);voiceDetails.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size});
             source.onended = null;
             source.disconnect();
             if (useSharedEffects) {
@@ -470,6 +507,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
             source.buffer = null;
           };
         };
+        if(nativeVoice){startVoice(null);return}
         if (cached) { startVoice(cached); return; }
         globalThis.netloomPerf?.event('sampleCacheMiss');
         if (!synthesisWorker || workerFailed) {
@@ -502,7 +540,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
         }).finally(() => { if (generation === synthesisGeneration) { preparingVoices--; scheduleSharedTail(); } });
       };
       for (let index = 0; index < layers.length; index++) {
-        const delay = selected === 'signalLoom' ? index * 0.19 : 0;
+        const delay = selected === 'signalLoom' && !audioClockSchedule ? index * 0.19 : 0;
         if (delay) {
           const timer = setTimeout(() => {
             scheduledVoices.delete(timer);
@@ -629,5 +667,5 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     source.start();
     return true;
   }
-  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>{let rms=null,peak=null;if(outputProbe){const samples=new Float32Array(outputProbe.fftSize);outputProbe.getFloatTimeDomainData(samples);rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);peak=samples.reduce((peak,x)=>Math.max(peak,Math.abs(x)),0)}return {rms,peak,state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size,preparing:preparingVoices,workerJobs:synthesisWorker?.pending||0,workerEnabled:!!synthesisWorker&&!workerFailed,workerActive:synthesisWorker?.active||false,effectsBuses:sharedEffects?1:0,effectTails:effectTails.size,cacheEntries:sampleCache.size,cacheBytes:sampleCacheBytes}}};
+  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>{let rms=null,peak=null;if(outputProbe){const samples=new Float32Array(outputProbe.fftSize);outputProbe.getFloatTimeDomainData(samples);rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);peak=samples.reduce((peak,x)=>Math.max(peak,Math.abs(x)),0)}return {rms,peak,state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size,retiring:retiringVoices.size,preparing:preparingVoices,workerJobs:synthesisWorker?.pending||0,workerEnabled:!!synthesisWorker&&!workerFailed,workerActive:synthesisWorker?.active||false,effectsBuses:sharedEffects?1:0,effectTails:effectTails.size,cacheEntries:sampleCache.size,cacheBytes:sampleCacheBytes}}};
 }
