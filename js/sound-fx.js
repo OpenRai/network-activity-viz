@@ -141,7 +141,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
       } else masterGain.connect(context.destination);
       context.onstatechange = () => {
         if (enabled && context?.state === 'running') {
-          onStatus('Sound enabled · pitch follows amount.');
+          onStatus('');
         } else if (enabled && ['suspended', 'interrupted'].includes(context?.state)) {
           recover();
         }
@@ -167,7 +167,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     operation.promise = Promise.race([resumed, cancelled, timeout]).then(() => {
       if (!enabled || context !== target) return;
       if (target.state !== 'running') throw new Error('Audio is still suspended.');
-      onStatus('Sound enabled · pitch follows amount.');
+      onStatus('');
       const cue = queued;
       queued = null;
       if (cue && Date.now() - cue.at < 2000) play(cue.options);

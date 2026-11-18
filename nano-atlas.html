@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Nano Atlas · Nano in motion</title>
   <meta name="description" content="Explore a live Nano account network. Follow each account’s block chain and the confirmed transfer paths connecting it to others.">
   <link rel="canonical" href="https://viz.openrai.org/nano-atlas.html">
@@ -24,10 +24,13 @@
   <meta name="twitter:image" content="https://viz.openrai.org/assets/og/nano-atlas-screenshot.png">
   <meta name="twitter:image:alt" content="Nano Atlas — connected Nano accounts, block chains and transfer paths">
   <meta name="theme-color" content="#050915">
+  <meta name="color-scheme" content="dark">
+  <style>html{background-color:#050915;color-scheme:dark}</style>
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Nano Atlas · Nano in motion","description":"Explore a live Nano account network. Follow each account’s block chain and the confirmed transfer paths connecting it to others.","url":"https://viz.openrai.org/nano-atlas.html","image":"https://viz.openrai.org/assets/og/nano-atlas-screenshot.png"}</script>
-  <link rel="stylesheet" href="styles/immersive.css">
+  <link rel="stylesheet" href="styles/immersive.css?v=shared-nav-2">
+<link rel="stylesheet" href="styles/visualization-credit.css?v=credit-link">
 </head>
 <body data-theme="atlas">
   <canvas id="scene" role="img" aria-label="Nano Atlas live account network with account block chains and confirmed transfer paths"></canvas>
@@ -61,7 +64,76 @@
   <script>
     const VIEW = 'atlas';
     const atlasLayout = new Map();
-    const viewOptions = {reset: () => atlasLayout.clear()};
+    let atlasYaw=0,atlasDrag=null,atlasDragged=false;
+    const viewOptions = {
+      reset: () => atlasLayout.clear(),
+      drawSelection: drawAtlasTether,
+      ignoreClick: event => atlasDragged && event.detail !== 0,
+      cursor: hit => atlasDrag?.moved ? 'grabbing' : hit ? 'pointer' : 'grab',
+    };
+    function bindAtlasRotation(){
+      canvas.style.cursor='grab';
+      canvas.addEventListener('pointerdown',event=>{
+        if(!event.isPrimary||event.button!==0)return;
+        atlasDragged=false;
+        atlasDrag={id:event.pointerId,x:event.clientX,y:event.clientY,yaw:atlasYaw,moved:false};
+      });
+      canvas.addEventListener('pointermove',event=>{
+        const drag=atlasDrag;
+        if(!drag||drag.id!==event.pointerId)return;
+        const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
+        if(!drag.moved){
+          if(Math.hypot(dx,dy)<6)return;
+          drag.moved=atlasDragged=true;
+          canvas.setPointerCapture(event.pointerId);
+        }
+        atlasYaw=(drag.yaw+dx*.009)%(Math.PI*2);
+        canvas.style.cursor='grabbing';
+      });
+      function finish(event){
+        if(atlasDrag?.id!==event.pointerId)return;
+        atlasDrag=null;
+        canvas.style.cursor='grab';
+      }
+      canvas.addEventListener('pointerup',finish);
+      canvas.addEventListener('pointercancel',finish);
+      canvas.addEventListener('lostpointercapture',finish);
+      canvas.addEventListener('pointerleave',event=>{if(!atlasDrag?.moved)finish(event)});
+    }
+    function drawAtlasTether(viewport){
+      const {selected,selectedAccount}=state;
+      if(!selected&&!selectedAccount)return;
+      const hit=hits.find(item=>selectedAccount
+        ? item.account===selectedAccount
+        : item.block?.hash===selected);
+      const panel=$('detail');
+      if(!hit||panel.hidden)return;
+      const x=hit.x??(hit.left+hit.right)/2,y=hit.y??(hit.top+hit.bottom)/2;
+      const bounds=panel.getBoundingClientRect();
+      const left=bounds.left-viewport.left,right=bounds.right-viewport.left;
+      const top=bounds.top-viewport.top,bottom=bounds.bottom-viewport.top;
+      if(x>=left&&x<=right&&y>=top&&y<=bottom)return;
+      const cx=(left+right)/2,cy=(top+bottom)/2;
+      const nearX=Math.max(left,Math.min(right,x)),nearY=Math.max(top,Math.min(bottom,y));
+      const sides=[
+        [left,cy,Math.hypot(x-left,y-nearY)],
+        [right,cy,Math.hypot(x-right,y-nearY)],
+        [cx,top,Math.hypot(x-nearX,y-top)],
+        [cx,bottom,Math.hypot(x-nearX,y-bottom)],
+      ];
+      const [endX,endY]=sides.reduce((nearest,side)=>side[2]<nearest[2]?side:nearest);
+      const now=performance.now();
+      ctx.save();
+      ctx.strokeStyle=colors.receive;
+      ctx.shadowColor=colors.receive;
+      ctx.shadowBlur=7;
+      ctx.globalAlpha=reducedMotion?.7:.72+.16*Math.sin(now/280);
+      ctx.lineWidth=1.75;
+      ctx.setLineDash([]);
+      ctx.beginPath();ctx.moveTo(endX,endY);ctx.lineTo(x,y);ctx.stroke();
+      ctx.restore();
+      dot(x,y,2.5,colors.receive,true);
+    }
     function atlasHash(value){let h=2166136261;for(const c of value)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h}
     function draw(m,w,h){
       const accountsByActivity=new Map();
@@ -85,7 +157,8 @@
       }
       const accountDepth=account=>{const value=depthByAccount.get(account);return value?value.sum/value.count:0};
       // A slow, bounded sway keeps the network facing the observer.
-      const theta=reducedMotion?0:Math.sin(state.time*.000025)*.06,cos=Math.cos(theta),sin=Math.sin(theta);
+      const sway=reducedMotion||atlasDrag?0:Math.sin(state.time*.000025)*.06;
+      const theta=atlasYaw+sway,cos=Math.cos(theta),sin=Math.sin(theta);
       function project(x,y,z=0){const dx=x-.5,rx=dx*cos-z*sin,rz=dx*sin+z*cos,perspective=1/(1-rz*.18);return{x:cx+rx*plotWidth*.97*perspective,y:cy+(y-.5)*plotHeight*.95*perspective-rz*plotHeight*.035,depth:rz}}
       const depthLight=depth=>Math.max(.82,Math.min(1,.91+depth*.25));
       const projected=new Map(accounts.map(account=>{const p=points.get(account);return[account,project(p.x,p.y,accountDepth(account))]}));
@@ -136,14 +209,18 @@
       if(!accounts.length)empty(w,h,'Waiting for confirmed account activity');
     }
   </script>
-  <script src="js/gallery-nav.js"></script>
-  <script src="js/format.js"></script>
+  <script src="js/gallery-nav.js?v=shared-nav-2"></script>
+  <script src="js/format.js?v=currency-prefix"></script>
   <script src="js/event-utils.js"></script>
   <script src="js/event-cache.js"></script>
   <script src="js/nano-feed.js?v=event-filter-1"></script>
   <script src="js/page-settings.js"></script>
   <script src="js/visualizer-core.js"></script>
-  <script src="js/canvas-view.js"></script>
-  <script>startVisualizer();</script>
+  <script src="js/canvas-view.js?v=atlas-rotation-1"></script>
+  <script>bindAtlasRotation();startVisualizer();</script>
+<div class="viz-credit">
+  <span class="viz-credit-caption">NANO / LIVE FEED</span>
+  <a class="viz-credit-maker" href="https://openrai.org/" aria-label="A Nano network visualization by the OpenRai Initiative">OPENRAI INITIATIVE ↗</a>
+</div>
 </body>
 </html>

@@ -1,0 +1,57 @@
+/* Shared by the visualization pages. Keep the credit clear of the gallery nav. */
+.viz-credit {
+  --credit-ink: #a8c4d0;
+  --credit-cyan: #70e5eb;
+  position: fixed;
+  z-index: 6;
+  right: max(4px, env(safe-area-inset-right));
+  top: calc(env(safe-area-inset-top) + 12px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 44px;
+  padding: 8px 4px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--credit-ink);
+  font: 9px/1.15 ui-monospace, monospace;
+  letter-spacing: .12em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.viz-credit::before {
+  content: "";
+  width: 13px;
+  height: 30px;
+  background: repeating-linear-gradient(135deg, #ffb45e 0 3px, #211808 3px 6px);
+}
+.viz-credit-maker {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  color: #ffc0d9;
+  font-weight: bold;
+  text-decoration: none;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.viz-credit-maker:hover { text-decoration: underline; }
+.viz-credit-maker:focus-visible { outline: 2px solid var(--credit-cyan); outline-offset: -3px; }
+.starmap .viz-credit {
+  visibility: hidden;
+  translate: 0 calc(-100% - env(safe-area-inset-top) - 12px);
+  transition: translate 160ms ease-in, visibility 0s linear 160ms;
+}
+.starmap:has(#hud[open]) .viz-credit {
+  visibility: visible;
+  translate: 0 0;
+  transition: translate 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .starmap .viz-credit,
+  .starmap:has(#hud[open]) .viz-credit { transition: none; }
+}
+@media (max-height: 480px) {
+  .viz-credit { gap: 5px; font-size: 8px; letter-spacing: .04em; }
+  .viz-credit .viz-credit-caption { display: none; }
+}

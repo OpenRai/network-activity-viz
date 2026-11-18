@@ -1,5 +1,5 @@
 'use strict';
-const netloomRenderWorkerURL=new URL('netloom-render-worker.js',document.currentScript.src);
+const netloomRenderWorkerURL=new URL('netloom-render-worker.js?v=currency-prefix',document.currentScript.src);
 function createNetloomRenderer(initialCanvas,{replace,metrics}) {
  let canvas=initialCanvas,worker=null,painter=null,transferred=false,stopped=false,ready=false,busy=false,latest=null,lastFrame=null,sentScene=null,timeout=null;
  let dpr=Math.min(devicePixelRatio||1,2);

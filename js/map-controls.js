@@ -3,6 +3,10 @@ if (!window.__mapPageZoomGuard) {
   window.addEventListener('wheel', event => { if (event.ctrlKey) event.preventDefault(); }, {capture:true,passive:false});
   for (const type of ['gesturestart','gesturechange','gestureend'])
     window.addEventListener(type, event => event.preventDefault(), {capture:true,passive:false});
+  // Safari may still zoom the page during multi-touch even on a touch-action:none canvas.
+  window.addEventListener('touchmove', event => {
+    if (event.touches.length > 1 && event.cancelable) event.preventDefault();
+  }, {capture:true,passive:false});
   window.addEventListener('dblclick', event => {
     if (!event.target.closest('input, select, textarea, button, summary'))
       event.preventDefault();
@@ -12,7 +16,7 @@ if (!window.__mapPageZoomGuard) {
 function createMapControls(surface, camera, viewport) {
   const pointers = new Map();
   let manual = false, blockedUntil = 0, lastTap = null, lastTwoTap = null, tapGroup = null;
-  let defaultScale = camera.s, wheelTimer, returning = false, nativeGestureScale = 1;
+  let defaultScale = camera.s, wheelTimer, returning = false, nativeGestureScale = 1, pointerPinch = false;
   surface.style.touchAction = 'none';
   function point(event) {
     const rect = surface.getBoundingClientRect(), view = viewport();
@@ -37,16 +41,25 @@ function createMapControls(surface, camera, viewport) {
     clearTimeout(wheelTimer);
     wheelTimer = setTimeout(() => { if (camera.s < defaultScale) reset(); }, 180);
   }, {passive:false});
-  surface.addEventListener('gesturestart', event => { event.preventDefault(); nativeGestureScale = 1; }, {passive:false});
+  surface.addEventListener('gesturestart', event => {
+    event.preventDefault();
+    nativeGestureScale = 1;
+    pointerPinch = pointers.size >= 2;
+  }, {passive:false});
   surface.addEventListener('gesturechange', event => {
     event.preventDefault();
-    if (!(event.scale > 0)) return;
+    if (pointerPinch || !(event.scale > 0)) return;
     const factor = event.scale/nativeGestureScale;
     nativeGestureScale = event.scale;
     const view = viewport();
     moveView({x:view.cx,y:view.cy},{x:view.cx,y:view.cy},factor);
   }, {passive:false});
-  surface.addEventListener('gestureend', event => { event.preventDefault(); nativeGestureScale = 1; }, {passive:false});
+  surface.addEventListener('gestureend', event => {
+    event.preventDefault();
+    nativeGestureScale = 1;
+    pointerPinch = false;
+    if (!pointers.size && camera.s < defaultScale) reset();
+  }, {passive:false});
   surface.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
     const p = point(event);
@@ -57,7 +70,10 @@ function createMapControls(surface, camera, viewport) {
       if (tapGroup.count>2) tapGroup.moved=true;
     }
     surface.setPointerCapture(event.pointerId);
-    if (pointers.size > 1) for (const pointer of pointers.values()) pointer.moved = true;
+    if (pointers.size > 1) {
+      pointerPinch = true;
+      for (const pointer of pointers.values()) pointer.moved = true;
+    }
   });
   surface.addEventListener('pointermove', event => {
     const pointer = pointers.get(event.pointerId);

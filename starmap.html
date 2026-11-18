@@ -35,8 +35,7 @@ html,body{margin:0;height:100%;background:var(--ink);color:var(--fg);overflow:hi
 font:13px/1.45 "Bahnschrift","DIN Alternate","Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif}
 canvas{position:absolute;inset:0 0 68px;width:100%;height:calc(100% - 68px)}
 #w,#o{pointer-events:none}
-#hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));
-width:min(300px,calc(100% - 20px));padding:12px 14px;background:rgba(8,7,24,.8);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(6px)}
+#hud{padding:12px 14px;background:rgba(8,7,24,.8);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(6px)}
 h1{font-size:20px;margin:0 0 4px;font-weight:700;letter-spacing:.01em}
 #st{display:flex;gap:7px;align-items:center;color:var(--dim);margin-bottom:8px}
 #dot{width:8px;height:8px;border-radius:50%;background:#666;flex:none}
@@ -54,14 +53,15 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 .reading strong{font-weight:600;color:#6ee2f0}
 .reading .activity{color:#f6c744}
 .reading .recency{color:#d282ff}
-.sound-toggle{justify-content:flex-start!important;gap:12px;cursor:pointer;min-height:48px}.sound-toggle input{width:24px;height:24px;accent-color:#5df0cc}.sound-symbol{font-size:32px;line-height:1}.sound-toggle:has(input:checked){color:#5df0cc}
 </style>
+<link rel="stylesheet" href="styles/visualization-credit.css?v=starmap-reveal">
 </head>
-<body>
+<body class="starmap">
 <canvas id="c"></canvas><canvas id="w"></canvas><canvas id="t"></canvas><canvas id="o"></canvas>
-<details id="hud">
+<div id="hud-shell">
+<details id="hud" data-start-collapsed>
 <summary><h1>Account galaxy</h1></summary>
-<label class="r sound-toggle" for="snd"><input id="snd" type="checkbox" aria-describedby="audioState"><span class="sound-symbol" aria-hidden="true">♫</span><span>Sound</span></label>
+<input id="snd" type="checkbox" hidden>
 <label class="r">Volume <input id="soundVolume" type="range" min="0" max="200" step="10" value="100"><span id="soundVolumeValue">100%</span></label>
 <label class="r">Sound set <select id="soundSet"><option value="ascent" selected>Starlight ascent · arpeggio</option><option value="aurora">Aurora silk</option><option value="cascade">Moonlit cascade · arpeggio</option><option value="velvet">Velvet nebula</option><option value="orbit">Orbital shimmer</option></select></label>
 <div id="audioState" class="n" role="status"></div>
@@ -69,24 +69,26 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <label class="r">Node <select id="host">
 <option value="wss://node.somenano.com/repeater">SomeNano network repeater</option>
 <option value="wss://ws.nano.to">Nano.to</option>
-<option value="stress">Stress demo · 30×</option><option value="demo">Simulated data</option></select></label>
+<option value="demo">Simulated data</option>
+<option value="stress">Stress demo · 30×</option></select></label>
 <label class="r">Memory <select id="win"><option value="10">10 minutes</option><option value="30" selected>30 minutes</option><option value="60">60 minutes</option></select></label>
 <button id="stressReplay" type="button" hidden>Replay 10-second stress demo</button>
 <label class="r" for="sparkles"><span>Ridiculous sparkles</span><input id="sparkles" type="checkbox" checked></label>
 <div id="stats"></div>
 <div class="n reading">
-<p><strong>Dots</strong> are accounts.<br><strong>Lines</strong> are transfers.</p>
-<p><strong class="activity">Size</strong> tells activity.<br><strong class="recency">Colour</strong> tells recency.</p>
+<p><strong>Dots</strong> are accounts.<br><strong>Lines</strong> are traces.</p>
+<p><strong class="activity">Size</strong> counts the traffic.<br><strong class="recency">Colour</strong> keeps time.</p>
 <p>Hover to <strong>discover.</strong></p>
 </div>
 </details>
-<script src="js/hud-card.js"></script>
-<script src="js/gallery-nav.js"></script>
-<script src="js/map-controls.js"></script>
+</div>
+<script src="js/hud-card.js?v=shared-sound-2"></script>
+<script src="js/gallery-nav.js?v=shared-nav-2"></script>
+<script src="js/map-controls.js?v=guard-2"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/event-cache.js"></script>
 <script src="js/nano-feed.js?v=event-filter-1"></script>
-<script src="js/sound-fx.js?v=volume-200"></script>
+<script src="js/sound-fx.js?v=volume-200-status"></script>
 <script src="js/logo-gravity.js"></script>
 <script src="js/stress-demo.js"></script>
 <script src="js/stardust-wake.js"></script>
@@ -118,18 +120,26 @@ const stardust=createStardustWake({reducedMotion:RM});
 const sparkles=$('sparkles');
 try{sparkles.checked=localStorage.getItem('ag-ridiculous-sparkles')!=='false'}catch{}
 sparkles.onchange=()=>{if(!sparkles.checked)stardust.clear();try{localStorage.setItem('ag-ridiculous-sparkles',String(sparkles.checked))}catch{}};
-const nodes=new Map(),edges=new Map(),comets=[],bursts=[],floats=[],cam={x:0,y:0,s:1},mouse={x:-99,y:-99};
+const nodes=new Map(),edges=new Map(),comets=[],bursts=[],floats=[],stellarExits=[],cam={x:0,y:0,s:1},mouse={x:-99,y:-99};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const short=a=>a.length>16?a.slice(0,9)+'\u2026'+a.slice(-4):a;
-const fmt=(x,raw)=>(typeof raw==='string'&&/^\d+$/.test(raw)?BigInt(raw)<1000000000000000000n:x<1e-12)?(typeof raw==='string'&&/^\d+$/.test(raw)?raw:'≈'+String(+(x*1e30).toPrecision(3)))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(3)):x.toExponential(1))+' XNO';
+const fmt=(x,raw)=>(typeof raw==='string'&&/^\d+$/.test(raw)?BigInt(raw)<1000000000000000000n:x<1e-12)?(typeof raw==='string'&&/^\d+$/.test(raw)?raw:'≈'+String(+(x*1e30).toPrecision(3)))+' raw':'Ӿ'+(x>=.001&&x<1e6?String(+x.toPrecision(3)):x.toExponential(1));
 const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
 const S=[[0,40,36,130],[.25,30,120,190],[.5,47,196,170],[.7,246,199,68],[.88,255,106,60],[1,255,238,244]];
-function hc(t){let j=1;while(j<S.length-1&&S[j][0]<t)j++;const a=S[j-1],b=S[j],u=(t-a[0])/(b[0]-a[0]);return[(a[1]+(b[1]-a[1])*u)|0,(a[2]+(b[2]-a[2])*u)|0,(a[3]+(b[3]-a[3])*u)|0]}
+// Leave a cool blue/cyan afterglow, then warm through orange and white into blue-white.
+const stellarPalette=[[0,19,91,168],[.34,38,171,211],[.55,224,102,70],[.73,255,194,110],[.88,255,240,210],[1,182,217,255]];
+function paletteColor(stops,t){let j=1;while(j<stops.length-1&&stops[j][0]<t)j++;const a=stops[j-1],b=stops[j],u=(t-a[0])/(b[0]-a[0]);return[(a[1]+(b[1]-a[1])*u)|0,(a[2]+(b[2]-a[2])*u)|0,(a[3]+(b[3]-a[3])*u)|0]}
 function mk(r,g,b){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d'),gr=x.createRadialGradient(32,32,0,32,32,32);
 gr.addColorStop(0,'rgba(255,255,255,.95)');gr.addColorStop(.12,`rgba(${r},${g},${b},.9)`);gr.addColorStop(.4,`rgba(${r},${g},${b},.25)`);gr.addColorStop(1,`rgba(${r},${g},${b},0)`);x.fillStyle=gr;x.fillRect(0,0,64,64);return c}
-const SP=[],CS=[];for(let i=0;i<16;i++){const[r,g,b]=hc(i/15);CS.push(r+','+g+','+b);SP.push(mk(r,g,b))}
+const CS=[],stellarColors=[],stellarSprites=[];
+for(let i=0;i<16;i++){
+  CS.push(paletteColor(S,i/15).join(','));
+  const rgb=paletteColor(stellarPalette,i/15);
+  stellarColors.push(rgb);stellarSprites.push(mk(...rgb));
+}
+const exitSprites=[mk(255,94,65),mk(163,27,40)];
 const KC={send:[255,238,244],receive:[110,226,240],open:[246,199,68],change:[210,130,255],epoch:[150,150,255]},KS={},RC={};
-for(const k in KC){KS[k]=k==='send'?SP[15]:mk(...KC[k]);RC[k]=KC[k].join(',')}
+for(const k in KC){KS[k]=mk(...KC[k]);RC[k]=KC[k].join(',')}
 const heat=age=>clamp(1-Math.log10(1+age/1e3)/Math.log10(1+winMs/1e3),0,1);
 const accountRadius=p=>Math.min(18,4+2.4*Math.log2(1+p.n));
 const stars=Array.from({length:150},()=>({x:random(),y:random(),z:.2+random()*.8}));
@@ -202,13 +212,16 @@ for(const e of edges.values()){const dx=e.d.x-e.s.x,dy=e.d.y-e.s.y,d=Math.sqrt(d
 for(const p of points){const scale=Math.min(1,.2/(Math.hypot(p.linkX,p.linkY)||1));p.fx+=p.linkX*scale;p.fy+=p.linkY*scale}
 }
 
-function prune(now){
+function prune(now,exitAt){
 const cut=now-winMs;nSends=0;nPend=0;
 for(const[k,e]of edges){let i=0;while(i<e.ts.length&&e.ts[i]<cut)i++;if(i){e.ts.splice(0,i);e.am.splice(0,i)}
 if(!e.ts.length)edges.delete(k);else{nSends+=e.ts.length;e.pend=Math.min(e.pend,e.ts.length);nPend+=e.pend}}
 for(;;){for(const p of nodes.values()){while(p.k.length&&p.k[0]<cut)p.k.shift();p.n=p.k.length}
 for(const e of edges.values()){e.s.n+=e.ts.length;e.d.n+=e.ts.length}
-for(const[k,p]of nodes)if(!p.n)nodes.delete(k);
+for(const[k,p]of nodes)if(!p.n){
+  if(!RM&&exitAt!==undefined&&p.last<cut&&stellarExits.length<120)stellarExits.push({x:p.x,y:p.y,at:exitAt});
+  nodes.delete(k);
+}
 if(nodes.size<=800)break;
 if(edges.size){for(const[k]of[...edges.entries()].sort((a,b)=>a[1].ts[a[1].ts.length-1]-b[1].ts[b[1].ts.length-1]).slice(0,40))edges.delete(k)}
 else for(const p of[...nodes.values()].sort((a,b)=>a.last-b.last).slice(0,40))nodes.delete(p.a)}
@@ -242,9 +255,23 @@ cx.setLineDash([]);cx.globalCompositeOperation='source-over';
 let hv=null,hd=1e9;
 const scale=starScale(),brightness=starBrightness();
 for(const p of nodes.values()){const h=heat(now-p.last),i=Math.round(h*15),rad=accountRadius(p)*(1+p.pulse*.35),sz=rad*3*scale,sx=X(p.x),sy=Y(p.y);
-cx.globalAlpha=Math.min(1,(.45+.25*h)*brightness);cx.drawImage(SP[i],sx-sz/2,sy-sz/2,sz,sz);cx.globalAlpha=1;cx.fillStyle=`rgb(${CS[i].split(',').map(v=>Math.min(255,Math.round(Number(v)*brightness))).join(',')})`;cx.beginPath();cx.arc(sx,sy,Math.max(1.3,rad*.22*scale),0,6.283);cx.fill();
+cx.globalAlpha=Math.min(1,(.32+.38*h)*brightness);cx.drawImage(stellarSprites[i],sx-sz/2,sy-sz/2,sz,sz);cx.globalAlpha=Math.min(1,.55+.45*h);cx.fillStyle=`rgb(${stellarColors[i].map(v=>Math.min(255,Math.round(v*brightness))).join(',')})`;cx.beginPath();cx.arc(sx,sy,Math.max(1.3,rad*.22*scale),0,6.283);cx.fill();
 p.pulse*=.94**timeScale();const dd=Math.hypot(sx-mouse.x,sy-mouse.y);if(dd<Math.max(10,rad*scale)+6&&dd<hd){hd=dd;hv=p}}
-hover=hv;
+cx.globalAlpha=1;hover=hv;
+}
+function drawStellarExits(now){
+  const scale=starScale();
+  for(let i=stellarExits.length-1;i>=0;i--){
+    const star=stellarExits[i],phase=(now-star.at)/1050;
+    if(phase>=1){stellarExits.splice(i,1);continue}
+    const size=(15+26*Math.min(1,phase/.34))*scale;
+    const light=Math.sin(Math.PI*Math.pow(Math.max(0,phase),.65))*.7;
+    const dark=Math.max(0,(phase-.25)/.75);
+    const x=X(star.x)-size/2,y=Y(star.y)-size/2;
+    cx.globalAlpha=light*(1-dark);cx.drawImage(exitSprites[0],x,y,size,size);
+    cx.globalAlpha=light*dark;cx.drawImage(exitSprites[1],x,y,size,size);
+  }
+  cx.globalAlpha=1;
 }
 function drawWake(pn){wx.setTransform(dpr,0,0,dpr,0,0);wx.clearRect(0,0,W,H);if(!sparkles.checked)return;stardust.update(pn);stardust.draw(wx,pn,X,Y,cam.s,starScale()/fittedScale,starBrightness())}
 function drawComets(pn){
@@ -280,15 +307,16 @@ ox.fillStyle=`rgba(${RC[f.kind||'send']},${1-a})`;ox.font='13px "Bahnschrift","D
 drawHover(now);
 }
 function frame(pn){
+const wallNow=pn;
 pn=animationNow();advanceStress();
 const now=timeNow(),steps=stressPlayback&&stressTime()>=stressPlayback.duration+8000?0:timeScale();
-for(let step=0;step<steps;step++)layout();if(now-lastPrune>1000){prune(now);lastPrune=now}
-fitCamera();drawBackground(pn);drawEdges(now);drawAccounts(now);drawWake(pn);drawComets(pn);drawOverlay(pn,now);
+for(let step=0;step<steps;step++)layout();if(now-lastPrune>1000){prune(now,wallNow);lastPrune=now}
+fitCamera();drawBackground(pn);drawEdges(now);drawAccounts(now);drawStellarExits(wallNow);drawWake(pn);drawComets(pn);drawOverlay(pn,now);
 requestAnimationFrame(frame)}
 
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
 const dupS=new Set(),dupQ=[];
-function clearAll(){stardust.clear();nodes.clear();edges.clear();sendBy.clear();want.clear();comets.length=bursts.length=floats.length=0;seen=0;cnt={};lastMsg=0;last=null;nSends=0;hubs=[];dupS.clear();dupQ.length=0}
+function clearAll(){stardust.clear();nodes.clear();edges.clear();sendBy.clear();want.clear();comets.length=bursts.length=floats.length=stellarExits.length=0;seen=0;cnt={};lastMsg=0;last=null;nSends=0;hubs=[];dupS.clear();dupQ.length=0}
 function rememberHash(hash){if(!hash)return;hash=String(hash).toUpperCase();if(dupS.has(hash))return;dupS.add(hash);dupQ.push(hash);if(dupQ.length>5000)dupS.delete(dupQ.shift())}
 function stop(){stressPlayback=null;$('stressReplay').hidden=true;clearTimeout(timer);if(feedClient){feedClient.stop();feedClient=null}}
 function connect(){
@@ -353,14 +381,9 @@ $('stats').textContent=`${nodes.size} accounts, ${edges.size} links, ${nSends} s
 (last?`\nLatest: ${fmt(last.x,last.raw)}, ${short(last.sa)} to ${short(last.da)}`:'')}
  $('host').onchange=()=>{clearAll();connect()};
 $('win').onchange=e=>{winMs=+e.target.value*6e4;prune(timeNow())};
-$('snd').onchange=async()=>{
-const checkbox=$('snd'),state=$('audioState');
-if(!checkbox.checked){soundFX.disable();state.textContent='';return}
-try{await soundFX.enable();if(!checkbox.checked)return;state.textContent='SoundFX enabled · pitch follows amount.';soundFX.play({frequency:440,volume:.12})}
-catch{if(checkbox.checked)state.textContent='Audio paused · turn sound off and on to retry.'}
-};
+bindHudSound(soundFX);
 addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
-addEventListener('click',e=>{if(hover&&!cameraControls.isGesture()&&!e.target.closest('#hud')&&navigator.clipboard){navigator.clipboard.writeText(hover.a).catch(()=>{});floats.push({d:hover,t0:animationNow(),txt:'address copied'})}});
+addEventListener('click',e=>{if(hover&&!cameraControls.isGesture()&&!e.target.closest('#hud-shell')&&navigator.clipboard){navigator.clipboard.writeText(hover.a).catch(()=>{});floats.push({d:hover,t0:animationNow(),txt:'address copied'})}});
 addEventListener('resize',size);
 setInterval(hud,500);setInterval(resolve,1500);
 const wq=new URLSearchParams(location.search).get('ws');if(/^wss?:\/\//.test(wq||'')){$('host').add(new Option('custom: '+new URL(wq).host,wq),0);$('host').value=wq}
@@ -369,5 +392,9 @@ if(new URLSearchParams(location.search).has('stress'))$('host').value='stress';
 size();connect();requestAnimationFrame(frame);
 })();
 </script>
+<div class="viz-credit">
+  <span class="viz-credit-caption">NANO / LIVE FEED</span>
+  <a class="viz-credit-maker" href="https://openrai.org/" aria-label="A Nano network visualization by the OpenRai Initiative">OPENRAI INITIATIVE ↗</a>
+</div>
 </body>
 </html>

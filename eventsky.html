@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Eventsky · Nano in motion</title>
   <meta name="description" content="Watch Nano sends and receives move through account lanes. Time sets the horizontal position; transfer amount shapes each event mark.">
   <link rel="canonical" href="https://viz.openrai.org/eventsky.html">
@@ -24,10 +24,13 @@
   <meta name="twitter:image" content="https://viz.openrai.org/assets/og/eventsky-screenshot.png">
   <meta name="twitter:image:alt" content="Eventsky — time-based Nano account lanes with linked send and receive events">
   <meta name="theme-color" content="#0b0918">
+  <meta name="color-scheme" content="dark">
+  <style>html{background-color:#0b0918;color-scheme:dark}</style>
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Eventsky · Nano in motion","description":"Watch Nano sends and receives move through account lanes. Time sets the horizontal position; transfer amount shapes each event mark.","url":"https://viz.openrai.org/eventsky.html","image":"https://viz.openrai.org/assets/og/eventsky-screenshot.png"}</script>
-  <link rel="stylesheet" href="styles/immersive.css">
+  <link rel="stylesheet" href="styles/immersive.css?v=shared-nav-2">
+<link rel="stylesheet" href="styles/visualization-credit.css?v=credit-link">
 </head>
 <body data-theme="eventsky">
   <canvas id="scene" role="img" aria-label="Eventsky timeline of Nano sends and receives by account, with transfer amount encoded as mark size"></canvas>
@@ -115,13 +118,13 @@
       for(const transfer of m.transfers){const interval=Math.floor(transfer.send.at/pathInterval);if(!pathsByInterval.has(interval))pathsByInterval.set(interval,transfer)}
       drawTransferPaths([...pathsByInterval.values()],laneIndex,x,y,right);
       drawAccountEvents(accounts,byAccount,laneIndex,x,y,m);
-      text('CONNECTED ACCOUNTS · TOP  /  10S',left,top-8,colors.receive,9);text('XNO AMOUNT',right,bottom+28,colors.send,9,'right');
+      text('CONNECTED ACCOUNTS · TOP  /  10S',left,top-8,colors.receive,9);text('AMOUNT (XNO)',right,bottom+28,colors.send,9,'right');
       text('TIME →',left,bottom+28,colors.muted,9);
       if(!eligible.length)empty(w,h,'Waiting for confirmed send and receive events');
     }
   </script>
-  <script src="js/gallery-nav.js"></script>
-  <script src="js/format.js"></script>
+  <script src="js/gallery-nav.js?v=shared-nav-2"></script>
+  <script src="js/format.js?v=currency-prefix"></script>
   <script src="js/event-utils.js"></script>
   <script src="js/event-cache.js"></script>
   <script src="js/nano-feed.js?v=event-filter-1"></script>
@@ -129,5 +132,9 @@
   <script src="js/visualizer-core.js"></script>
   <script src="js/canvas-view.js"></script>
   <script>startVisualizer();</script>
+<div class="viz-credit">
+  <span class="viz-credit-caption">NANO / LIVE FEED</span>
+  <a class="viz-credit-maker" href="https://openrai.org/" aria-label="A Nano network visualization by the OpenRai Initiative">OPENRAI INITIATIVE ↗</a>
+</div>
 </body>
 </html>

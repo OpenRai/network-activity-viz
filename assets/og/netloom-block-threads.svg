@@ -22,7 +22,7 @@
  <circle cx="520" cy="461" r="7"/><circle cx="688" cy="455" r="7"/><circle cx="890" cy="274" r="7"/><circle cx="1098" cy="420" r="7"/>
 </g>
 <g fill="#83aabe" font-family="monospace" font-size="13" opacity=".8">
- <text x="401" y="355">SEND / HASH 9F2…A17</text><text x="635" y="209">RECEIVE / 0.42 XNO</text><text x="842" y="329">BLOCK 7CA…D04</text><text x="1010" y="190">NOW · LIVE</text>
+ <text x="401" y="355">SEND / HASH 9F2…A17</text><text x="635" y="209">RECEIVE / Ӿ0.42</text><text x="842" y="329">BLOCK 7CA…D04</text><text x="1010" y="190">NOW · LIVE</text>
 </g>
 <path d="M0 0h1200v10H0z" fill="url(#thread)" opacity=".8"/>
 <g font-family="Arial,Helvetica,sans-serif">

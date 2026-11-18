@@ -52,7 +52,7 @@ function dissolveExits() {
   }
 }
 
-function setup(){const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(rect.width*dpr)||canvas.height!==Math.round(rect.height*dpr)){canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);hits=[];return {w:rect.width,h:rect.height}}
+function setup(){const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(rect.width*dpr)||canvas.height!==Math.round(rect.height*dpr)){canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);hits=[];return rect}
 function text(label,x,y,color=colors.muted,size=11,align='left'){ctx.fillStyle=color;ctx.font=size+'px ui-monospace,monospace';ctx.textAlign=align;ctx.fillText(label,x,y);ctx.textAlign='left'}
 function line(x1,y1,x2,y2,color,width=1,dash=[]){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([])}
 function dot(x,y,r,color,glow=false){ctx.save();ctx.fillStyle=color;if(glow){ctx.shadowColor=color;ctx.shadowBlur=16}ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore()}
@@ -88,12 +88,13 @@ function mark(block, x, y, radius = 5, role = 'block', interactive = true, opaci
 }
 function empty(w,h,message){text(message,w/2,h/2,colors.muted,12,'center')}
 function containsHit(hit,x,y){return hit.left!==undefined?x>=hit.left&&x<=hit.right&&y>=hit.top&&y<=hit.bottom:Math.hypot(x-hit.x,y-hit.y)<hit.r}
-canvas.onclick=e=>{const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hits.slice().reverse().find(p=>containsHit(p,x,y));if(hit){if(hit.account)inspectAccount(hit.account);else inspect(hit.block)}else{state.selected=null;state.selectedAccount=null;render()}};
-canvas.onmousemove=e=>{if(document.body.dataset.theme==='eventsky'){canvas.style.cursor='default';return}const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;canvas.style.cursor=hits.some(p=>containsHit(p,x,y))?'pointer':'default'};
+canvas.onclick=e=>{if(viewOptions.ignoreClick?.(e))return;const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hits.slice().reverse().find(p=>containsHit(p,x,y));if(hit){if(hit.account)inspectAccount(hit.account);else inspect(hit.block)}else{state.selected=null;state.selectedAccount=null;render()}};
+canvas.onmousemove=e=>{if(document.body.dataset.theme==='eventsky'){canvas.style.cursor='default';return}const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=hits.some(p=>containsHit(p,x,y));canvas.style.cursor=viewOptions.cursor?.(hit)??(hit?'pointer':'default')};
 function render(){
- const m=model();activeVotePulses=m.votePulses;updatePanels(m);const {w,h}=setup();
+ const m=model();activeVotePulses=m.votePulses;updatePanels(m);const rect=setup(),{width:w,height:h}=rect;
  if(w!==visualWidth||h!==visualHeight){visualItems.clear();visualWidth=w;visualHeight=h;}
  visualFrame++;draw(m,w,h);dissolveExits();
+ viewOptions.drawSelection?.(rect);
 }
 if($('viewMode'))$('viewMode').onchange=()=>{visualItems.clear();render()};
 let previous=performance.now(),painted=0;

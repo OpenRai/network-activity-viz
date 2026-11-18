@@ -13,15 +13,7 @@ soundVolume.oninput=()=>{soundVolumeValue.textContent=soundVolume.value+'%';soun
 try{const saved=localStorage.getItem('netloom-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
 soundFX.setSoundSet(soundSet.value);
 soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('netloom-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
-const soundToggle=$('snd'),quickSound=$('quickSound');
-function syncQuickSound(){quickSound.setAttribute('aria-pressed',String(soundToggle.checked))}
-syncQuickSound();
-soundToggle.addEventListener('input',syncQuickSound);
-quickSound.onclick=()=>soundToggle.click();
-soundToggle.onchange=()=>{
- if(!soundToggle.checked){soundFX.disable();return}
- soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{$('audioState').textContent='Audio paused · turn sound off and on to retry.'});
-};
+bindHudSound(soundFX);
 let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,bandWeights=new Map(),drift=0,vignette,w,h,camera={x:0,y:0,s:1},cameraControls;
 const PLANE_W=1600,PLANE_H=1000;
 const smoothScene=!RM&&!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('smoothScene')==='0');
@@ -90,7 +82,7 @@ function build(now){
 }
 
 const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
-const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2))+' XNO';
+const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':'Ӿ'+(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2));
 function render(){
  const pn=performance.now(),ease=RM?1:timeCamera?netloomCameraEase(pn-lastCameraTime):.12;lastCameraTime=pn;
  const {scale,focusY,anchorX,anchorY}=framing;

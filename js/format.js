@@ -14,7 +14,7 @@ function formatNanoAmount(raw, keepDecimalZero = false) {
     const whole = value / 10n ** 30n;
     const fraction = (value % 10n ** 30n).toString().padStart(30, '0').replace(/0+$/, '');
     const decimals = fraction ? '.' + fraction : keepDecimalZero ? '.0' : '';
-    return whole.toString() + decimals + ' XNO';
+    return 'Ӿ' + whole.toString() + decimals;
   } catch {
     return keepDecimalZero ? 'amount unavailable' : 'amount unknown';
   }

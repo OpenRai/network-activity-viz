@@ -11,7 +11,7 @@ function paintGrid(c){
  for(let col=0;col<64;col++){const x=col*26;c.strokeStyle=col%8?'#071a32':'#123149';c.beginPath();c.moveTo(x,0);c.lineTo(x,PLANE_H);c.stroke()}
 }
 const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
-const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2))+' XNO';
+const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':'Ӿ'+(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2));
 
  function resize(dpr){
   if(density===dpr)return;density=dpr;canvas.width=Math.round(PLANE_W*dpr);canvas.height=Math.round(PLANE_H*dpr);
