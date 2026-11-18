@@ -1,0 +1,42 @@
+{
+  "audio-before": {
+    "runs": 3,
+    "build_p50_ms": 0.7999999523162842,
+    "build_p95_ms": 2.0999999046325684,
+    "frame_p99_ms": 1050,
+    "synthesized_layers": 201,
+    "reused_layers": 0,
+    "long_tasks": 30,
+    "peak_cache_bytes": 0
+  },
+  "audio-after": {
+    "runs": 3,
+    "build_p50_ms": 0.7000000476837158,
+    "build_p95_ms": 2.5,
+    "frame_p99_ms": 1050,
+    "synthesized_layers": 73,
+    "reused_layers": 137,
+    "long_tasks": 28,
+    "peak_cache_bytes": 21986304
+  },
+  "graphics-before": {
+    "runs": 3,
+    "build_p50_ms": 1.2000000476837158,
+    "build_p95_ms": 1.899999976158142,
+    "frame_p99_ms": 50,
+    "synthesized_layers": 0,
+    "reused_layers": 0,
+    "long_tasks": 0,
+    "peak_cache_bytes": 0
+  },
+  "graphics-after": {
+    "runs": 3,
+    "build_p50_ms": 1,
+    "build_p95_ms": 1.899999976158142,
+    "frame_p99_ms": 50,
+    "synthesized_layers": 0,
+    "reused_layers": 0,
+    "long_tasks": 0,
+    "peak_cache_bytes": 0
+  }
+}

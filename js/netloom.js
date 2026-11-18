@@ -7,18 +7,27 @@ let T=gallerySettings.memoryMs,Te=6e4,t0=Date.now(),cnt={},lastMsg=0,mode='sqrt'
 const soundFX=createSoundFX({profile:'cyber',onStatus:message=>{$('audioState').textContent=message}}),soundSet=$('soundSet');
 globalThis.netloomSoundFX=soundFX;
 const soundVolume=$('soundVolume'),soundVolumeValue=$('soundVolumeValue');
-try{const saved=Number(localStorage.getItem('netloom-sound-volume'));if(saved>=50&&saved<=150)soundVolume.value=saved}catch{}
+try{const saved=localStorage.getItem('netloom-sound-volume');if(saved!==null&&Number.isFinite(Number(saved)))soundVolume.value=saved}catch{}
 soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);soundVolumeValue.textContent=soundVolume.value+'%';
 soundVolume.oninput=()=>{soundVolumeValue.textContent=soundVolume.value+'%';soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);try{localStorage.setItem('netloom-sound-volume',soundVolume.value)}catch{}};
 try{const saved=localStorage.getItem('netloom-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
 soundFX.setSoundSet(soundSet.value);
 soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('netloom-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
-$('snd').onchange=()=>{if(!$('snd').checked){soundFX.disable();return}soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{$('audioState').textContent='Audio paused · turn sound off and on to retry.'})};
+const soundToggle=$('snd'),quickSound=$('quickSound');
+function syncQuickSound(){quickSound.setAttribute('aria-pressed',String(soundToggle.checked))}
+syncQuickSound();
+soundToggle.addEventListener('input',syncQuickSound);
+quickSound.onclick=()=>soundToggle.click();
+soundToggle.onchange=()=>{
+ if(!soundToggle.checked){soundFX.disable();return}
+ soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{$('audioState').textContent='Audio paused · turn sound off and on to retry.'});
+};
 let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,bandWeights=new Map(),drift=0,vignette,w,h,camera={x:0,y:0,s:1},cameraControls;
 const PLANE_W=1600,PLANE_H=1000;
 const smoothScene=!RM&&!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('smoothScene')==='0');
 let lastCameraTime=performance.now();
 const timeCamera=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('cameraTime')==='0');
+let framing, spectrum;
 let scene=null,lastLayoutAt=0,viewMatrix=[1,0,0,1,0,0];
 const cullScene=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('cullScene')==='0');
 const useLabelCache=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('labelCache')==='0');
@@ -29,6 +38,7 @@ function markerStyle(m){
 const useGridCache=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('gridCache')==='0');
 function size(){
  const oldW=w||innerWidth,oldH=h||innerHeight;dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;
+ framing=netloomDefaultFraming(w,h);
  if(cameraControls){camera.x+=(w-oldW)/2;camera.y+=(h-oldH)/2}else{camera={x:w/2,y:h/2,s:1};cameraControls=createMapControls(ov,camera,()=>({width:w,height:h,cx:w/2,cy:h/2}))}
  renderer.resize(dpr);
  Object.assign(cv.style,{width:PLANE_W+'px',height:PLANE_H+'px',inset:'0 auto auto 0',transformOrigin:'0 0',willChange:'transform',imageRendering:'auto'});
@@ -36,10 +46,12 @@ function size(){
  ox.setTransform(dpr,0,0,dpr,0,0);
  vignette=ox.createRadialGradient(w*.56,h*.48,Math.min(w,h)*.12,w*.55,h*.5,Math.max(w,h)*.58);
  vignette.addColorStop(0,'rgba(0,2,14,0)');vignette.addColorStop(.6,'rgba(0,2,14,.18)');vignette.addColorStop(1,'rgba(0,2,14,.98)');
+ const right=w-24,width=Math.min(220,Math.max(1,w-48));
+ const gradient=ox.createLinearGradient(right-width,0,right,0);
+ gradient.addColorStop(0,'#063356');gradient.addColorStop(.45,'#00c9f1');
+ gradient.addColorStop(.75,'#ffae26');gradient.addColorStop(1,'#ff422b');
+ spectrum={right,width,gradient};
  lastB=0;overlay(Date.now());
- const legend=$('lg').getContext('2d'),gradient=legend.createLinearGradient(0,0,256,0);
- for(const [at,color] of [[0,'#063356'],[.45,'#00c9f1'],[.75,'#ffae26'],[1,'#ff422b']])gradient.addColorStop(at,color);
- legend.fillStyle=gradient;legend.fillRect(0,0,256,8);
 }
 function hashCode(value){let hash=2166136261;for(const char of value)hash=Math.imul(hash^char.charCodeAt(0),16777619)>>>0;return hash}
 function prepareScene(now){
@@ -81,25 +93,27 @@ const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
 const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':(x>=.001&&x<1e6?String(+x.toPrecision(4)):x.toExponential(2))+' XNO';
 function render(){
  const pn=performance.now(),ease=RM?1:timeCamera?netloomCameraEase(pn-lastCameraTime):.12;lastCameraTime=pn;
- const scale=Math.min(w/1450,h/850)*1.35;
+ const {scale,focusY,anchorX,anchorY}=framing;
  drift+=((RM||cameraControls.isGesture()?0:tx*12)-drift)*ease;
  // Animate the cached plane on the compositor, without repainting the viewport.
  const elapsed=Math.max(0,Math.min(Te,Date.now()-lastB)),ratio=boardWindow/Te;
  const a=scale*.91,b=-scale*.27,c=scale*.48,d=scale*.59;
- const focusX=1520+elapsed/Te*1460,focusY=970;
+ const focusX=1520+elapsed/Te*1460;
  if(cameraControls.springing()){
   camera.x+=(w/2-camera.x)*ease;camera.y+=(h/2-camera.y)*ease;camera.s+=(1-camera.s)*ease;
   if(Math.abs(camera.x-w/2)<.05&&Math.abs(camera.y-h/2)<.05&&Math.abs(camera.s-1)<.0005){camera.x=w/2;camera.y=h/2;camera.s=1;cameraControls.setDefaultScale(1)}
  }
- const frontierX=w*.94,frontierY=(h-68)*.84;
- const translateX=frontierX+drift-a*ratio*focusX-c*focusY,translateY=frontierY-b*ratio*focusX-d*focusY;
+ const translateX=anchorX+drift-a*ratio*focusX-c*focusY,translateY=anchorY-b*ratio*focusX-d*focusY;
  viewMatrix=[a*ratio*camera.s,b*ratio*camera.s,c*camera.s,d*camera.s,w/2+(translateX-camera.x)*camera.s,h/2+(translateY-camera.y)*camera.s];
  cv.style.transform=`matrix(${a*ratio*camera.s},${b*ratio*camera.s},${c*camera.s},${d*camera.s},${w/2+(translateX-camera.x)*camera.s},${h/2+(translateY-camera.y)*camera.s})`;
 }
 function overlay(now){
  ox.clearRect(0,0,w,h);ox.fillStyle=vignette;ox.fillRect(0,0,w,h);ox.font='10px monospace';ox.fillStyle='#598195';ox.textAlign='right';
- ox.fillText('CONFIRMED BLOCKS / AMOUNT × OBSERVER TIME',w-30,h-110);
- ox.fillStyle='#285568';ox.fillText('CYAN / RECEIVE     AMBER / SEND     TRACES / OBSERVED SOURCE',w-30,h-92);
+ const {right,width,gradient}=spectrum;
+ ox.fillText(new Date(now).toISOString().replace(/\.\d{3}Z$/,'Z'),right,h-128);
+ ox.fillText('CONFIRMED BLOCKS / AMOUNT × OBSERVER TIME',right,h-111,w-48);
+ ox.fillStyle=gradient;ox.fillRect(right-width,h-104,width,4);
+ ox.fillStyle='#285568';ox.fillText('LINKED TRACES / OBSERVED SOURCE',right,h-87,w-48);
  if(!markers.length){ox.fillStyle='#71bbd1';ox.textAlign='center';ox.fillText('WAITING FOR CONFIRMED BLOCKS',w*.58,h*.48)}
 }
 
@@ -152,7 +166,7 @@ $('stats').textContent=`${n} sends in view, ${m1} in the last minute\nShowing ${
 
 `\nTiles: confirmed blocks · traces: source references`+
 (last?`\nLatest: ${fmt(last.x)} ${last.hash.slice(0,8)}`:'');
-$('mx').textContent='confirmed block activity'}
+}
 
 gallerySettings.onNodeChange(connect);
 gallerySettings.onMemoryChange(()=>{T=gallerySettings.memoryMs;});

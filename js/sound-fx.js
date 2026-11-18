@@ -218,8 +218,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}} = {}) {
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
   }
   function setVolumeMultiplier(value) {
-    const percent = Math.max(50, Math.min(150, (Number(value) || 1) * 100));
-    const perceivedLoudness = Math.pow(percent / 100, 1.65);
+    const multiplier = Number(value);
+    const bounded = Number.isFinite(multiplier) ? Math.max(0, Math.min(2, multiplier)) : 1;
+    const perceivedLoudness = Math.pow(bounded, 1.65);
     const calibration = profile === 'cyber' ? .52 : 2.0;
     volumeMultiplier = calibration * perceivedLoudness;
     if (context && masterGain) masterGain.gain.setTargetAtTime(volumeMultiplier, context.currentTime, .015);

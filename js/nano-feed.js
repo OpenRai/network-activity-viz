@@ -1,9 +1,78 @@
 'use strict';
+// Filters receive one group per upstream message. Only delivery to onPacket is
+// delayed; connection health is updated as soon as the source reports activity.
+function createImmediateEventFilter(emit) {
+  return {push(packets){for(const packet of packets)emit(packet)}, stop(){}};
+}
+
+function createSomeNanoEventFilter(emit) {
+  const halfWindow = 2500;
+  const pending = [];
+  let timer = null, stopped = false;
+  const hashKey = value => typeof value === 'string' ? value.toUpperCase() : '';
+
+  function describe(packet) {
+    const message = packet.message;
+    let block = message?.block;
+    if (typeof block === 'string') {
+      try { block = JSON.parse(block); } catch { block = null; }
+    }
+    const subtype = block?.subtype || message?.subtype || block?.type;
+    return {
+      packet, subtype, hash:hashKey(message?.hash),
+      source: subtype === 'receive' || subtype === 'open' ? hashKey(block?.source || block?.link) : '',
+    };
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = pending.length ? setTimeout(deliver, Math.max(0, Math.ceil(pending[0].due-performance.now()))) : null;
+  }
+
+  function deliver() {
+    const now = performance.now();
+    while (!stopped && pending.length && pending[0].due <= now) emit(pending.shift().packet);
+    if (!stopped) schedule();
+  }
+
+  return {
+    push(packets, {batched, receivedAt}) {
+      if (stopped) return;
+      if (!batched) {
+        for(const packet of packets) { if(stopped)break; emit(packet); }
+        return;
+      }
+      if (!packets.length) return;
+      const entries = packets.map(describe);
+      const sendHashes = new Set(entries.filter(e=>e.subtype==='send' && e.hash).map(e=>e.hash));
+      const pairedSends = new Set(entries.map(e=>e.source).filter(hash=>sendHashes.has(hash)));
+      for (const entry of entries) {
+        const pairedReceive = pairedSends.has(entry.source);
+        const pairedSend = entry.subtype === 'send' && pairedSends.has(entry.hash);
+        const start = pairedReceive ? halfWindow : 0;
+        const span = pairedReceive || pairedSend ? halfWindow : halfWindow*2;
+        const offset = start + Math.min(span-1, Math.floor(Math.random()*span));
+        pending.push({packet:entry.packet,due:receivedAt+offset});
+      }
+      pending.sort((a,b)=>a.due-b.due);
+      schedule();
+    },
+    stop() {
+      stopped = true;
+      clearTimeout(timer);
+      pending.length = 0;
+    },
+  };
+}
+
 // Nano application-level keepalive: https://docs.nano.org/integration-guides/websockets/#keepalive
 // Shared by the visualizer pages. Classic scripts also support opening the HTML through file://.
-function createNanoFeed(endpoint, {onPacket, onStatus, onGap}) {
-  const host = new URL(endpoint).host;
-  const repeater = new URL(endpoint).pathname.replace(/\/$/,'')==='/repeater';
+// createEventFilter(emit) returns {push(packets, {batched, receivedAt}), stop()}.
+function createNanoFeed(endpoint, {onPacket, onStatus, onGap, createEventFilter}) {
+  const url = new URL(endpoint);
+  const host = url.host;
+  const repeater = url.pathname.replace(/\/$/,'')==='/repeater';
+  const someNano = repeater && url.hostname==='node.somenano.com';
   const subscriptions = repeater ? [{action:'subscribe',topic:'confirmation'}] : [
     {action:'subscribe',topic:'confirmation',ack:true,id:'confirmations',options:{confirmation_type:'all',include_block:true,include_election_info:true}},
     {action:'subscribe',topic:'vote',ack:true,id:'votes'}
@@ -13,6 +82,9 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap}) {
   let lastConfirmation = null;
   let pingSentAt = null, heartbeat = 'awaiting heartbeat', lastEvent = null, hadGap = false;
   let topicState = {}, topicErrors = {}, endpointError = '';
+  const eventFilter = (createEventFilter ?? (someNano ? createSomeNanoEventFilter : createImmediateEventFilter))(packet=>{
+    if(!stopped)onPacket(packet);
+  });
   function publish() {
     const confirmationIdle = lastConfirmation === null ? 0 : performance.now()-lastConfirmation;
     const topics = ['confirmation','vote'].map(topic => topic+': '+(topicErrors[topic]||(topic==='confirmation'&&confirmationIdle>=30000?'idle / '+Math.floor(confirmationIdle/1000)+'s':topicState[topic])||'pending')).join(' · ');
@@ -96,6 +168,7 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap}) {
     };
     current.onmessage=async event=>{
       if(stopped||ws!==current)return;
+      const receivedAt=performance.now();
       let packet;
       try{
         let data=event.data;
@@ -106,7 +179,9 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap}) {
       if(!packet||typeof packet!=='object')return;
       const batch=packet.block_dump||packet;
       if(repeater&&Array.isArray(batch.blocks)){
-        for(const block of batch.blocks)receiveEvent(block.message?{...block,topic:'confirmation'}:{topic:'confirmation',message:block});
+        const packets=batch.blocks.filter(block=>block&&typeof block==='object').map(block=>
+          block.message?{...block,topic:'confirmation'}:{topic:'confirmation',message:block});
+        receiveEvents(packets,true,receivedAt);
         return;
       }
       if(packet.ack==='pong'){handlePong();return}
@@ -117,17 +192,19 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap}) {
         publish();return;
       }
       if(packet.topic==='confirmation'||packet.topic==='vote'){
-        receiveEvent(packet);
+        receiveEvents([packet],false,receivedAt);
       }
     };
     current.onerror=()=>{if(ws===current)reconnect('Websocket connection error')};
     current.onclose=event=>{if(ws===current)reconnect('Websocket closed ('+event.code+')')};
   }
-  function receiveEvent(packet){
-    if(packet.topic==='confirmation')lastConfirmation=performance.now();
+  function receiveEvents(packets,batched,receivedAt){
+    if(!packets.length)return;
+    const topic=packets[0].topic;
+    if(topic==='confirmation')lastConfirmation=performance.now();
     if(repeater){heartbeat='repeater / events received';attempts=0}
-    topicState[packet.topic]='receiving';delete topicErrors[packet.topic];lastEvent=performance.now();
-    onPacket(packet);publish();
+    topicState[topic]='receiving';delete topicErrors[topic];lastEvent=performance.now();
+    eventFilter.push(packets,{batched,receivedAt});publish();
   }
   function wake() {
     if(stopped)return;
@@ -139,6 +216,6 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap}) {
   document.addEventListener('visibilitychange',wake);
   window.addEventListener('online',wake);
   connect();
-  return {stop(){stopped=true;clearTimeout(retryTimer);retryTimer=null;retireSocket();document.removeEventListener('visibilitychange',wake);window.removeEventListener('online',wake)}};
+  return {stop(){stopped=true;eventFilter.stop();clearTimeout(retryTimer);retryTimer=null;retireSocket();document.removeEventListener('visibilitychange',wake);window.removeEventListener('online',wake)}};
 }
 

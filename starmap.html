@@ -62,7 +62,7 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <details id="hud">
 <summary><h1>Account galaxy</h1></summary>
 <label class="r sound-toggle" for="snd"><input id="snd" type="checkbox" aria-describedby="audioState"><span class="sound-symbol" aria-hidden="true">♫</span><span>Sound</span></label>
-<label class="r">Volume <input id="soundVolume" type="range" min="50" max="150" step="1" value="100"><span id="soundVolumeValue">100%</span></label>
+<label class="r">Volume <input id="soundVolume" type="range" min="0" max="200" step="10" value="100"><span id="soundVolumeValue">100%</span></label>
 <label class="r">Sound set <select id="soundSet"><option value="ascent" selected>Starlight ascent · arpeggio</option><option value="aurora">Aurora silk</option><option value="cascade">Moonlit cascade · arpeggio</option><option value="velvet">Velvet nebula</option><option value="orbit">Orbital shimmer</option></select></label>
 <div id="audioState" class="n" role="status"></div>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
@@ -85,8 +85,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <script src="js/map-controls.js"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/event-cache.js"></script>
-<script src="js/nano-feed.js"></script>
-<script src="js/sound-fx.js"></script>
+<script src="js/nano-feed.js?v=event-filter-1"></script>
+<script src="js/sound-fx.js?v=volume-200"></script>
 <script src="js/logo-gravity.js"></script>
 <script src="js/stress-demo.js"></script>
 <script src="js/stardust-wake.js"></script>
@@ -100,7 +100,7 @@ const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 let W=1,H=1,dpr=1,winMs=30*6e4,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
 const soundFX=createSoundFX({onStatus:message=>{$('audioState').textContent=message}});
 const soundVolume=$('soundVolume'),soundVolumeValue=$('soundVolumeValue');
-try{const saved=Number(localStorage.getItem('ag-sound-volume'));if(saved>=50&&saved<=150)soundVolume.value=saved}catch{}
+try{const saved=localStorage.getItem('ag-sound-volume');if(saved!==null&&Number.isFinite(Number(saved)))soundVolume.value=saved}catch{}
 soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);soundVolumeValue.textContent=soundVolume.value+'%';
 soundVolume.oninput=()=>{soundVolumeValue.textContent=soundVolume.value+'%';soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);try{localStorage.setItem('ag-sound-volume',soundVolume.value)}catch{}};
 const soundSet=$('soundSet');

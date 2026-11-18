@@ -1,0 +1,50 @@
+{
+  "audio-before": {
+    "runs": 3,
+    "canvas_p50_ms": 0.7000000476837158,
+    "canvas_p95_ms": 1.899999976158142,
+    "frame_p99_ms": 1033.4000000000015,
+    "rejected_events": 420,
+    "audio_clock_wall_ratios": [
+      0.2852628962975379,
+      0.3423424623171487,
+      0.19230214854218372
+    ],
+    "output_rms_range": [
+      0.06133714455864954,
+      0.22349354096520319
+    ],
+    "effects_buses_max": 0
+  },
+  "audio-after": {
+    "runs": 3,
+    "canvas_p50_ms": 1,
+    "canvas_p95_ms": 1.600000023841858,
+    "frame_p99_ms": 1049.1000000000004,
+    "rejected_events": 328,
+    "audio_clock_wall_ratios": [
+      1.000035525235919,
+      0.9996003729852138,
+      0.9998423871950589
+    ],
+    "output_rms_range": [
+      0.0511232579206224,
+      0.2682002733104491
+    ],
+    "effects_buses_max": 1
+  },
+  "graphics-before": {
+    "runs": 3,
+    "canvas_p50_ms": 4.699999928474426,
+    "canvas_p95_ms": 6.100000023841858,
+    "frame_p99_ms": 50.29999999999927,
+    "rejected_events": 0
+  },
+  "graphics-after": {
+    "runs": 3,
+    "canvas_p50_ms": 3.8000000715255737,
+    "canvas_p95_ms": 4.700000047683716,
+    "frame_p99_ms": 50.100000000000364,
+    "rejected_events": 0
+  }
+}

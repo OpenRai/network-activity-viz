@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const pages=['starmap','nano-atlas','eventsky','netloom'];
 const source=readFileSync(root+'js/nano-feed.js','utf8');
-function harness(endpoint='wss://test.example/ws'){
+function harness(endpoint='wss://test.example/ws',{random=()=>1,createEventFilter}={}){
  let now=0,id=0;const timers=new Map(),sockets=[],statuses=[],packets=[],gaps=[];
  const document=new EventTarget();document.hidden=false;const window=new EventTarget();
  class Socket{
@@ -16,14 +16,14 @@ function harness(endpoint='wss://test.example/ws'){
   message(p){this.onmessage?.({data:JSON.stringify(p)})}
   close(){this.readyState=3;this.onclose?.({code:1000})}
  }
- const math=Object.create(Math);math.random=()=>1;
+ const math=Object.create(Math);math.random=random;
  const context=vm.createContext({URL,TextDecoder,WebSocket:Socket,document,window,Math:math,performance:{now:()=>now},setTimeout:(fn,delay)=>{const token=++id;timers.set(token,{at:now+delay,fn});return token},clearTimeout:token=>timers.delete(token)});
  vm.runInContext(source,context);
- const client=context.createNanoFeed(endpoint,{onPacket:p=>packets.push(p),onStatus:s=>statuses.push(s),onGap:g=>gaps.push(g)});
+ const client=context.createNanoFeed(endpoint,{onPacket:p=>packets.push(p),onStatus:s=>statuses.push(s),onGap:g=>gaps.push(g),createEventFilter});
  function advance(ms){const target=now+ms;for(;;){const next=[...timers].filter(([,t])=>t.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;timers.delete(next[0]);now=next[1].at;next[1].fn()}now=target}
  return {client,sockets,statuses,packets,gaps,timers,advance,document,window};
 }
-test('all four visualizations load the shared transport exactly once',()=>{for(const name of pages){const html=readFileSync(root+name+'.html','utf8');expect(html.match(/src="js\/nano-feed\.js"/g)?.length).toBe(1);expect(html).not.toContain('function createNanoFeed(')}});
+test('all four visualizations load the shared transport exactly once',()=>{for(const name of pages){const html=readFileSync(root+name+'.html','utf8');expect(html.match(/src="js\/nano-feed\.js(?:\?[^"]*)?"/g)?.length).toBe(1);expect(html).not.toContain('function createNanoFeed(')}});
 test('ongoing confirmations keep one connection alive beyond three minutes',()=>{
  const h=harness(),s=h.sockets[0];s.open();s.message({ack:'pong'});
  for(let i=0;i<13;i++){h.advance(15000);s.message({ack:'pong'});s.message({topic:'confirmation',message:{hash:String(i)}})}
@@ -68,9 +68,10 @@ test('repeater uses event liveness and accepts native and batched confirmations'
  s.message({topic:'confirmation',message:{hash:'A'}});
  s.message({block_dump:{blocks:[{hash:'B'},{topic:'confirmation',message:{hash:'C'}}]}});
  s.message({topic:'confirmation',blocks:[{hash:'D'}],duration:5000});
- expect(h.packets.map(p=>p.message.hash)).toEqual(['A','B','C','D']);
+ expect(h.packets.map(p=>p.message.hash)).toEqual(['A']);
+ h.advance(4999);expect(h.packets.map(p=>p.message.hash)).toEqual(['A','B','C','D']);
  expect(h.statuses.at(-1)).toContain('unavailable on repeater');
- h.advance(45000);expect(h.gaps.length).toBe(1);h.client.stop();expect(h.timers.size).toBe(0);
+ h.advance(40001);expect(h.gaps.length).toBe(1);h.client.stop();expect(h.timers.size).toBe(0);
 });
 test('binary JSON confirmations and Blob pongs are decoded in the browser',async()=>{
  const h=harness(),s=h.sockets[0];s.open();expect(s.binaryType).toBe('arraybuffer');
@@ -83,4 +84,31 @@ test('late Blob decoding cannot deliver from a retired connection',async()=>{
  const pending=s.onmessage({data:{text:()=>new Promise(resolve=>{finish=resolve})}});
  h.client.stop();finish(JSON.stringify({topic:'confirmation',message:{hash:'STALE'}}));await pending;
  expect(h.packets.length).toBe(0);
+});
+
+
+test('SomeNano schedules linked sends before receives and unrelated blocks across the full window',()=>{
+ const draws=[0,.99,.2,.9];
+ const h=harness('wss://node.somenano.com/repeater',{random:()=>draws.shift()});
+ const s=h.sockets[0];s.open();
+ s.message({blocks:[
+   {hash:'R',account:'recipient',block:JSON.stringify({subtype:'receive',link:'send'})},
+   {hash:'SEND',account:'sender',block:{subtype:'send'}},
+   {hash:'U',account:'recipient',block:{subtype:'send'}},
+   {hash:'LATE',account:'sender',block:{subtype:'send'}},
+ ]});
+ const delivered=()=>h.packets.map(p=>p.message.hash);
+ h.advance(999);expect(delivered()).toEqual([]);
+ h.advance(1);expect(delivered()).toEqual(['U']);
+ h.advance(1475);expect(delivered()).toEqual(['U','SEND']);
+ h.advance(25);expect(delivered()).toEqual(['U','SEND','R']);
+ h.client.stop();h.advance(5000);expect(delivered()).toEqual(['U','SEND','R']);
+ expect(h.timers.size).toBe(0);
+});
+test('the immediate filter can override SomeNano and preserves batch order',()=>{
+ const h=harness('wss://node.somenano.com/repeater',{createEventFilter:emit=>({
+   push(packets,meta){expect(meta).toEqual({batched:true,receivedAt:0});packets.forEach(emit)},stop(){}
+ })});
+ const s=h.sockets[0];s.open();s.message({blocks:[{hash:'B'},{hash:'A'}]});
+ expect(h.packets.map(p=>p.message.hash)).toEqual(['B','A']);h.client.stop();
 });

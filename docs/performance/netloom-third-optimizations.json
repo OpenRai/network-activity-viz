@@ -1,0 +1,49 @@
+{
+  "audio-before": {
+    "runs": 3,
+    "frame_p99_ms": 1033.4000000000005,
+    "long_tasks": 31,
+    "main_thread_synthesis_calls": 139,
+    "worker_errors": 0,
+    "paint_hz": 4.644960218179886,
+    "layout_and_paint_ms_per_second": 4.455166176900503,
+    "paint_p95_ms": 1.2000000476837158,
+    "band_step_p95_pixels": 7.240521777878428,
+    "clock_wall_ratio": 0.9999245038379374
+  },
+  "audio-after": {
+    "runs": 3,
+    "frame_p99_ms": 50.099999999999454,
+    "long_tasks": 0,
+    "main_thread_synthesis_calls": 0,
+    "worker_errors": 0,
+    "paint_hz": 9.439474985357569,
+    "layout_and_paint_ms_per_second": 7.912601734049099,
+    "paint_p95_ms": 1.100000023841858,
+    "band_step_p95_pixels": 10.476192103365861,
+    "clock_wall_ratio": 1.0001554415650746,
+    "worker_latency_p95_ms": 82.10000002384186
+  },
+  "graphics-before": {
+    "runs": 3,
+    "frame_p99_ms": 50.5,
+    "long_tasks": 0,
+    "main_thread_synthesis_calls": 0,
+    "worker_errors": 0,
+    "paint_hz": 9.436552912100257,
+    "layout_and_paint_ms_per_second": 38.84963931285499,
+    "paint_p95_ms": 3.9000000953674316,
+    "band_step_p95_pixels": 1.6170680916563924
+  },
+  "graphics-after": {
+    "runs": 3,
+    "frame_p99_ms": 50.5,
+    "long_tasks": 0,
+    "main_thread_synthesis_calls": 0,
+    "worker_errors": 0,
+    "paint_hz": 26.21683570289834,
+    "layout_and_paint_ms_per_second": 73.05758217660217,
+    "paint_p95_ms": 3.700000047683716,
+    "band_step_p95_pixels": 0.5492923523529498
+  }
+}
