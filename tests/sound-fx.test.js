@@ -2,7 +2,7 @@ import {test,expect} from 'bun:test';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('../js/sound-fx.js',import.meta.url),'utf8');
-function harness(fail=false,profile='ethereal',workerMode=false){
+function harness(fail=false,profile='ethereal',workerMode=false, starmapWorker=false, {protocol="http:", hasWorker=workerMode||starmapWorker}={}){
  const contexts=[],buffers=[],voices=[],gains=[],convolvers=[];
  let now=Date.now();class Clock extends Date {static now(){return now}}
  class AudioContext {
@@ -24,10 +24,13 @@ function harness(fail=false,profile='ethereal',workerMode=false){
  const asyncJobs=[];
  const workerClient={generate(sampleRate,parameters){return new Promise((resolve,reject)=>asyncJobs.push({parameters,resolve,reject,sampleRate}))},cancelAll(){},get pending(){return asyncJobs.length}};
  const window=new EventTarget(),document=new EventTarget();window.AudioContext=AudioContext;
- const context=vm.createContext({window,document,WebAssembly,Uint8Array,setTimeout,clearTimeout,Date:Clock,performance,Worker:workerMode?function(){}:undefined,createZzfxWorkerClient:()=>workerClient});
+ const legacyJobs=[];
+ const legacyWorker={generate(cue){return new Promise(resolve=>legacyJobs.push({resolve,cue}))},cancelAll(){}};
+ const fixedMath=Object.create(Math);fixedMath.random=()=>.625;
+ const context=vm.createContext({window,document,WebAssembly,Uint8Array,Math:fixedMath,location:{protocol},setTimeout,clearTimeout,Date:Clock,performance,Worker:hasWorker?function(){}:undefined,createZzfxWorkerClient:()=>workerClient,createStarmapAudioWorker:()=>legacyWorker});
  vm.runInContext(readFileSync(new URL('../js/zzfx-parameters.js',import.meta.url),'utf8'),context);
  vm.runInContext(source,context);
- return{fx:context.createSoundFX({profile}),asyncJobs,completeJobs(){for(const job of asyncJobs.splice(0))job.resolve({samples:context.zzfxBuildSamples(...job.parameters),duration:1})},convolvers,contexts,buffers,voices,gains,window,document,elapse:ms=>{now+=ms}};
+ return{fx:context.createSoundFX({profile,starmapWorker}),legacyJobs,asyncJobs,completeJobs(){for(const job of asyncJobs.splice(0))job.resolve({samples:context.zzfxBuildSamples(...job.parameters),duration:1})},convolvers,contexts,buffers,voices,gains,window,document,elapse:ms=>{now+=ms}};
 }
 test('sound requires opt-in and WASM generates a finite, nonzero waveform',async()=>{
  const h=harness();expect(h.fx.play()).toBe(false);expect(h.contexts.length).toBe(0);
@@ -190,4 +193,80 @@ test('Signal Loom schedules its staggered notes on the audio clock without timer
  expect(h.voices).toHaveLength(4);expect(h.fx.diagnostics().scheduled).toBe(0);
  for(let i=1;i<4;i++)expect(h.voices[i].startedAt-h.voices[0].startedAt).toBeCloseTo(i*.19,5);
  h.fx.disable();expect(h.voices.every(v=>v.stopped)).toBe(true);
+});
+
+test('Starmap worker transfers the same PCM as synchronous playback at fixed jitter', async () => {
+ const workerScript = readFileSync(new URL('../js/starmap-audio-worker.js', import.meta.url), 'utf8');
+ let response, transferred;
+ const self = {postMessage(data, transfer){response=data;transferred=transfer}};
+ const worker = vm.createContext({self,performance,importScripts(name){
+  expect(name).toBe('sound-fx.js?v=starmap-worker-1');
+  vm.runInContext(source,worker);
+ }});
+ vm.runInContext(workerScript, worker);
+ const sync = harness();
+ const async = harness(false, 'ethereal', false, true);
+ await sync.fx.enable();
+ await async.fx.enable();
+ for (const preset of ['ascent','aurora','cascade','velvet','orbit']) {
+  sync.fx.setSoundSet(preset);
+  async.fx.setSoundSet(preset);
+  for (const outside of [false,true]) {
+   const cue = {frequency:365, account:'test-account', duration:1.2, outside, subtype:outside?'receive':'send'};
+   sync.fx.play(cue);
+   async.fx.play(cue);
+   const job = async.legacyJobs.shift();
+   self.onmessage({data:{id:1,cue:job.cue}});
+   expect(transferred).toEqual([response.samples.buffer]);
+   expect(Buffer.from(response.samples.buffer)).toEqual(Buffer.from(sync.buffers.at(-1).buffer));
+   job.resolve({...response,deadline:performance.now()+250});
+   await Promise.resolve();
+   await Promise.resolve();
+   expect(async.voices.at(-1).started).toBe(true);
+  }
+ }
+ sync.fx.dispose();
+ async.fx.dispose();
+});
+
+test('Starmap counts preparing voices and ignores expired or cancelled worker results', async () => {
+ const h = harness(false,'ethereal',false,true);
+ const done = async (job, deadline=performance.now()+250) => {
+  job.resolve({samples:new Float32Array(16),deadline});
+  await Promise.resolve();
+  await Promise.resolve();
+ };
+ await h.fx.enable();
+ for(let i=0;i<12;i++) expect(h.fx.play()).toBe(true);
+ expect(h.fx.play()).toBe(false);
+ expect(h.fx.diagnostics().preparing).toBe(12);
+ await done(h.legacyJobs.shift(),performance.now()-1);
+ expect(h.voices).toHaveLength(0);
+ expect(h.fx.play()).toBe(true);
+ h.fx.setSoundSet('velvet');
+ for(const job of h.legacyJobs.splice(0)) await done(job);
+ expect(h.voices).toHaveLength(0);
+ h.fx.play();
+ h.contexts[0].state='closed';
+ await h.fx.enable();
+ await done(h.legacyJobs.shift());
+ expect(h.voices).toHaveLength(0);
+ h.fx.play();
+ h.fx.disable();
+ await done(h.legacyJobs.shift());
+ expect(h.voices).toHaveLength(0);
+ expect(h.fx.diagnostics().preparing).toBe(0);
+ h.fx.dispose();
+});
+
+test('Starmap uses synchronous playback on file URLs and without Worker support', async () => {
+ for (const environment of [{protocol:'file:'}, {hasWorker:false}]) {
+  const h = harness(false, 'ethereal', false, true, environment);
+  await h.fx.enable();
+  h.fx.setSoundSet('velvet');
+  expect(h.fx.play()).toBe(true);
+  expect(h.legacyJobs).toHaveLength(0);
+  expect(h.voices.at(-1).started).toBe(true);
+  h.fx.dispose();
+ }
 });

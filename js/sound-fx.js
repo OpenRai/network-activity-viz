@@ -1,9 +1,118 @@
 'use strict';
 // Generated oscillator bytes are embedded so this also works through file://.
 // Source: ../wasm/tone.wat. Web Audio handles playback; WASM generates each waveform.
-function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
-  const wasmBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 125, 1, 125, 3, 2, 1, 0, 7, 10, 1, 6, 115, 97, 109, 112, 108, 101, 0, 0, 10, 52, 1, 50, 1, 1, 125, 67, 0, 0, 128, 63, 67, 0, 0, 128, 64, 32, 0, 67, 0, 0, 0, 63, 147, 139, 148, 147, 33, 1, 67, 0, 0, 192, 63, 32, 1, 148, 67, 0, 0, 0, 63, 32, 1, 32, 1, 32, 1, 148, 148, 148, 147, 11]);
-  let context = null, oscillator = null, enabled = false;
+const legacyOscillatorBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 125, 1, 125, 3, 2, 1, 0, 7, 10, 1, 6, 115, 97, 109, 112, 108, 101, 0, 0, 10, 52, 1, 50, 1, 1, 125, 67, 0, 0, 128, 63, 67, 0, 0, 128, 64, 32, 0, 67, 0, 0, 0, 63, 147, 139, 148, 147, 33, 1, 67, 0, 0, 192, 63, 32, 1, 148, 67, 0, 0, 0, 63, 32, 1, 32, 1, 32, 1, 148, 148, 148, 147, 11]);
+let legacyOscillator;
+
+// Shared by the audio engine and its worker. The caller may supply a channel
+// view to synthesize directly into an AudioBuffer on the synchronous path.
+function buildLegacySoundSamples(cue, samples = new Float32Array(Math.ceil(cue.rate * cue.duration))) {
+  const {rate, duration, pitch, selected, preset, alien, lfoDepth, outside, magnitude, eventTone, eventSeed, subtype} = cue;
+  if (selected === 'velvet') {
+    legacyOscillator ||= new WebAssembly.Instance(new WebAssembly.Module(legacyOscillatorBytes)).exports;
+  }
+  const length = samples.length;
+  let phase = 0, swooshPhase = 0;
+  let noiseSeed = 73129, smoothNoise = 0, lowNoise = 0;
+  const usesLfo = outside || alien;
+  const lfoAmount = Math.max(0, Math.min(.8, lfoDepth));
+  const lfoRate = alien?.am || 4.5;
+  const attack = preset.attack;
+  const decay = preset.decay;
+  const phaseStep = pitch / rate;
+  const noteRatios = preset.steps?.map(step => 2 ** (step / 12));
+  const notePitches = noteRatios?.map(ratio => pitch * ratio);
+  const noiseLength = Math.max(.12, Math.min(3, duration));
+  const swooshOctave = selected === 'velvet' ? .5 : 1;
+  const sweepLength = Math.min(1, noiseLength / 3);
+  const startCutoff = (7200 - 900 * sweepLength) * swooshOctave;
+  const endCutoff = (520 - 180 * sweepLength) * swooshOctave;
+  const cutoffRatio = endCutoff / startCutoff;
+  for (let i = 0; i < length; i++) {
+    const time = i / rate;
+    const lfo = usesLfo ? 1 - lfoAmount * (.5 - .5 * Math.cos(2 * Math.PI * lfoRate * time)) : 1;
+    const envelope = Math.min(1, time / attack) * Math.exp(-time * decay) * Math.min(1, (duration-time) / .03);
+    const sine = ratio => Math.sin(time * pitch * Math.PI * 2 * ratio);
+    let wave;
+    // Restrained digital partials and detuned layers evoke period patches;
+    // no pitch sweeps, heavy bass, or full-strength supersaw stacks.
+    if (alien) {
+      const mod = Math.sin(time * alien.mod * Math.PI * 2);
+      wave = .52 * Math.sin(time * pitch * alien.ratio * Math.PI * 2 + alien.index * mod)
+        + .22 * Math.sin(time * pitch * .503 * Math.PI * 2 + 1.3 * mod)
+        + .12 * Math.sin(time * pitch * 2.017 * Math.PI * 2);
+      if (preset.steps) {
+        for (let step = 0; step < preset.steps.length; step++) {
+          const age = time - step * .19;
+          if (age >= 0) wave += .13 * Math.sin(age * pitch * noteRatios[step] * Math.PI * 2) * Math.min(1, age / .055) * Math.exp(-age * 5);
+        }
+      }
+      wave *= lfo;
+    } else switch (selected) {
+      case 'aurora': wave = .32*sine(.997) + .27*sine(1.003) + .08*sine(2); break;
+      case 'ascent':
+      case 'cascade': {
+        wave = 0;
+        // Stagger soft notes with overlapping releases, rather than abruptly
+        // stepping oscillator frequency. The event's amount sets the root.
+        for (let step = 0; step < preset.steps.length; step++) {
+          const age = time - step * .19;
+          if (age < 0) continue;
+          const note = notePitches[step];
+          const noteEnvelope = Math.min(1, age / .055) * Math.exp(-age * 5);
+          wave += .32 * Math.sin(age * note * Math.PI * 2) * noteEnvelope;
+        }
+        break;
+      }
+      case 'choir': {
+        noiseSeed = (Math.imul(noiseSeed, 1664525) + 1013904223) >>> 0;
+        smoothNoise += .035 * ((noiseSeed / 2147483648 - 1) - smoothNoise);
+        const drift = Math.sin(time * Math.PI * 2 * .23) * .0018;
+        const voice = ratio => Math.sin(time * pitch * (1 + drift) * Math.PI * 2 * ratio);
+        // Low, softly detuned vowel-like voices with a little filtered breath.
+        wave = .43*voice(1) + .31*voice(1.004) + .16*voice(.5) + .09*smoothNoise;
+        break;
+      }
+      case 'velvet': phase = (phase + phaseStep) % 1; wave = .4*sine(.998) + .18*sine(1.002) + .08*legacyOscillator.sample(phase); break;
+      case 'orbit': wave = (.4*sine(1) + .16*sine(1.004) + .07*sine(3))*(.85+.15*Math.cos(time*Math.PI*2*.7)); break;
+      case 'circuitWeave': wave = .34*sine(1) + (.12+.16*magnitude)*sine(2.01) + .14*sine(3.98+eventTone*.01) + .08*sine(7.02+(eventSeed%9)*.002); break;
+      case 'signalLoom': { const pulse=.5+.5*Math.sin(time*Math.PI*2*(2.2+magnitude*2.4)+(eventSeed%100)/100); wave=(.36*sine(1)+.2*sine(1.5)+.12*sine(2.5))*(.58+.42*pulse); break; }
+      case 'neonPulse': { const pulse=Math.exp(-time*(7+magnitude*7))*(1+.35*Math.sin(time*Math.PI*2*(13+magnitude*11))); wave=(.38*sine(1)+(.08+.12*magnitude)*sine(2.03))*pulse; break; }
+      case 'threadResonance': { const detune=.001+(magnitude*.003); wave=.34*sine(1-detune)+.31*sine(1+detune)+.13*sine(2.006)+.06*sine(3.01); break; }
+      case 'nodeChoir': {
+        wave=0;
+        for(let step=0;step<preset.steps.length;step++){const order=subtype==='receive'?preset.steps.length-1-step:step,age=time-step*(.18+magnitude*.1);if(age>=0)wave+=(.2+.1*magnitude)*Math.sin(age*pitch*noteRatios[order]*Math.PI*2)*Math.min(1,age/.08)*Math.exp(-age*2.8)}
+        break;
+      }
+      default: wave = .45*sine(1) + .2*sine(1.005) + .15*sine(3);
+    }
+    if (outside) {
+      // A breath of filtered static swells in, then dissolves. It marks
+      // missing source history, not an unconfirmed or incomplete transfer.
+      noiseSeed = (Math.imul(noiseSeed, 1664525) + 1013904223) >>> 0;
+      const noise = noiseSeed / 2147483648 - 1;
+      const progress = Math.min(1, time / noiseLength);
+      // A clear down-sweep gives the outside receive its own airy arrival
+      // gesture in every sound set. Longer flights sweep more slowly and
+      // finish darker, in time with the comet's travel.
+      const sweep = progress * progress * (3 - 2 * progress);
+      const cutoff = startCutoff * Math.pow(cutoffRatio, sweep);
+      const coefficient = 1 - Math.exp(-2 * Math.PI * cutoff / rate);
+      smoothNoise += coefficient * (noise - smoothNoise);
+      const lowCutoff = cutoff * .52;
+      lowNoise += (1 - Math.exp(-2 * Math.PI * lowCutoff / rate)) * (smoothNoise - lowNoise);
+      const bandNoise = smoothNoise - lowNoise;
+      const swell = Math.sin(Math.PI * progress) ** 1.35;
+      const sweepHz = pitch * swooshOctave * (2.8 * Math.pow(.28, sweep));
+      swooshPhase = (swooshPhase + sweepHz / rate) % 1;
+      samples[i] = .25 * wave * envelope + (.72 * bandNoise + .272 * Math.sin(swooshPhase * Math.PI * 2)) * swell * lfo;
+    } else samples[i] = wave * envelope;
+  }
+  return samples;
+}
+
+function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf, starmapWorker = false} = {}) {
+  let context = null, enabled = false;
   const voices = new Set();
   const voiceDetails = new Map(), retiringVoices = new Set();
   const adaptivePolyphony = profile === 'cyber' && !(globalThis.netloomPerf && new URLSearchParams(location.search).get('voicePolicy') === '0');
@@ -31,6 +140,9 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
   const workerSynthesis = profile === 'cyber' && typeof Worker !== 'undefined' && globalThis.location?.protocol !== 'file:' && typeof createZzfxWorkerClient === 'function'
     && !(globalThis.netloomPerf && new URLSearchParams(location.search).get('workerSynthesis') === '0');
   const synthesisWorker = workerSynthesis ? createZzfxWorkerClient() : null;
+  const legacyWorker = starmapWorker && typeof Worker !== 'undefined' && globalThis.location?.protocol !== 'file:'
+    && typeof createStarmapAudioWorker === 'function' ? createStarmapAudioWorker() : null;
+  let legacyWorkerFailed = false;
   const pendingSamples = new Map();
   let synthesisGeneration = 0, preparingVoices = 0, workerFailed = false;
   const nativeSustain = !(globalThis.netloomPerf && new URLSearchParams(location.search).get('nativeSustain') === '0');
@@ -101,6 +213,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
   function clearVoices() {
     synthesisGeneration++; preparingVoices = 0;
     synthesisWorker?.cancelAll(); pendingSamples.clear();
+    legacyWorker?.cancelAll();
     for(const timer of scheduledVoices)clearTimeout(timer);scheduledVoices.clear();
     for (const voice of new Set([...voices,...retiringVoices])) {
       try { voice.stop(); } catch {}
@@ -132,6 +245,11 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return Promise.reject(new Error('Web Audio is unavailable in this browser.'));
     if (!context || context.state === 'closed') {
+      if (context) {
+        const cue = queued;
+        release();
+        queued = cue;
+      }
       try { context = new AudioContextClass(); }
       catch (error) { return Promise.reject(error); }
       masterGain = context.createGain();
@@ -147,7 +265,6 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
         }
       };
     }
-    oscillator ||= new WebAssembly.Instance(new WebAssembly.Module(wasmBytes)).exports;
     const target = context;
     if (target.state === 'running') return Promise.resolve();
     clearVoices();
@@ -228,6 +345,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
   function play({frequency = 440, volume = 0.15, duration, outside = false, account = '', amount = 0.001, subtype = 'send', at = Date.now(), hash = '', lfoDepth = profile === 'alien' ? .24 : .12} = {}) {
     globalThis.netloomPerf?.event('soundRequested');
     perf?.event('soundRequested');
+    const requestedAt = perf ? performance.now() : 0;
     if (!enabled || disposed) {
       perf?.event('soundSkippedDisabled');
       return false;
@@ -238,7 +356,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
       recover();
       return false;
     }
-    if (!adaptivePolyphony && voices.size >= (profile === 'cyber' && backend === 'zzfx' ? 28 : 12)) {globalThis.netloomPerf?.event('soundRejected',{reason:'capacity',voices:voices.size});perf?.event('soundRejectedCapacity');return false;}
+    if (!adaptivePolyphony && voices.size + (legacyWorker ? preparingVoices : 0) >= (profile === 'cyber' && backend === 'zzfx' ? 28 : 12)) {globalThis.netloomPerf?.event('soundRejected',{reason:'capacity',voices:voices.size});perf?.event('soundRejectedCapacity');return false;}
     const preset = sets[selected];
     const magnitude = Math.max(0, Math.min(1, (Math.log10(Math.max(1e-30, amount)) + 5) / 10));
     const eventTone = subtype === 'send' ? 1 : subtype === 'open' ? 1.12 : .92;
@@ -557,138 +675,84 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf} = {}) {
       }
       return true;
     }
-    const synthStarted = perf ? performance.now() : 0;
-    const rate = context.sampleRate, length = Math.ceil(rate * duration);
-    const buffer = context.createBuffer(1, length, rate), samples = buffer.getChannelData(0);
-    let phase = 0, swooshPhase = 0;
-    let noiseSeed = 73129, smoothNoise = 0, lowNoise = 0;
+    const owner = context;
+    const rate = owner.sampleRate;
     const pitch = (selected === 'velvet' || selected === 'choir' || selected === 'nodeChoir' ? frequency / 2 : frequency) * eventTone;
-    const alien = profile === 'alien' ? alienSets[selected] : null;
-    const usesLfo = outside || alien;
-    const lfoAmount = Math.max(0, Math.min(.8, lfoDepth));
-    const lfoRate = alien?.am || 4.5;
-    const attack = preset.attack;
-    const decay = preset.decay;
-    const phaseStep = pitch / rate;
-    const noteRatios = preset.steps?.map(step => 2 ** (step / 12));
-    const notePitches = noteRatios?.map(ratio => pitch * ratio);
-    const noiseLength = Math.max(.12, Math.min(3, duration));
-    const swooshOctave = selected === 'velvet' ? .5 : 1;
-    const sweepLength = Math.min(1, noiseLength / 3);
-    const startCutoff = (7200 - 900 * sweepLength) * swooshOctave;
-    const endCutoff = (520 - 180 * sweepLength) * swooshOctave;
-    const cutoffRatio = endCutoff / startCutoff;
-    for (let i = 0; i < length; i++) {
-      const time = i / rate;
-      const lfo = usesLfo ? 1 - lfoAmount * (.5 - .5 * Math.cos(2 * Math.PI * lfoRate * time)) : 1;
-      const envelope = Math.min(1, time / attack) * Math.exp(-time * decay) * Math.min(1, (duration-time) / .03);
-      const sine = ratio => Math.sin(time * pitch * Math.PI * 2 * ratio);
-      let wave;
-      // Restrained digital partials and detuned layers evoke period patches;
-      // no pitch sweeps, heavy bass, or full-strength supersaw stacks.
-      if (alien) {
-        const mod = Math.sin(time * alien.mod * Math.PI * 2);
-        wave = .52 * Math.sin(time * pitch * alien.ratio * Math.PI * 2 + alien.index * mod)
-          + .22 * Math.sin(time * pitch * .503 * Math.PI * 2 + 1.3 * mod)
-          + .12 * Math.sin(time * pitch * 2.017 * Math.PI * 2);
-        if (preset.steps) {
-          for (let step = 0; step < preset.steps.length; step++) {
-            const age = time - step * .19;
-            if (age >= 0) wave += .13 * Math.sin(age * pitch * noteRatios[step] * Math.PI * 2) * Math.min(1, age / .055) * Math.exp(-age * 5);
-          }
+    const cue = {rate, duration, pitch, selected, preset, alien:profile === 'alien' ? alienSets[selected] : null,
+      lfoDepth, outside, magnitude, eventTone, eventSeed, subtype};
+    if (legacyWorker && !legacyWorkerFailed) {
+      const generation = synthesisGeneration;
+      preparingVoices++;
+      legacyWorker.generate(cue).then(result => {
+        if (generation !== synthesisGeneration || context !== owner || !enabled || owner.state !== 'running') return;
+        if (result.expired || performance.now() >= result.deadline) {
+          perf?.event('soundExpired');
+          return;
         }
-        wave *= lfo;
-      } else switch (selected) {
-        case 'aurora': wave = .32*sine(.997) + .27*sine(1.003) + .08*sine(2); break;
-        case 'ascent':
-        case 'cascade': {
-          wave = 0;
-          // Stagger soft notes with overlapping releases, rather than abruptly
-          // stepping oscillator frequency. The event's amount sets the root.
-          for (let step = 0; step < preset.steps.length; step++) {
-            const age = time - step * .19;
-            if (age < 0) continue;
-            const note = notePitches[step];
-            const noteEnvelope = Math.min(1, age / .055) * Math.exp(-age * 5);
-            wave += .32 * Math.sin(age * note * Math.PI * 2) * noteEnvelope;
-          }
-          break;
+        const copyStarted = perf ? performance.now() : 0;
+        const {samples} = result;
+        const buffer = owner.createBuffer(1, samples.length, rate);
+        buffer.getChannelData(0).set(samples);
+        perf?.record('bufferCopy', performance.now() - copyStarted);
+        perf?.record('workerSynthesis', result.computeMs);
+        perf?.record(outside ? 'workerOutsideReceiveSynthesis' : 'workerToneSynthesis', result.computeMs);
+        perf?.record('workerQueueDelay', result.queueMs);
+        perf?.record('generatedBufferBytes', samples.byteLength);
+        startLegacyVoice(buffer);
+      }).catch(() => {
+        if (generation === synthesisGeneration) {
+          legacyWorkerFailed = true;
+          perf?.event('workerError');
         }
-        case 'choir': {
-          noiseSeed = (Math.imul(noiseSeed, 1664525) + 1013904223) >>> 0;
-          smoothNoise += .035 * ((noiseSeed / 2147483648 - 1) - smoothNoise);
-          const drift = Math.sin(time * Math.PI * 2 * .23) * .0018;
-          const voice = ratio => Math.sin(time * pitch * (1 + drift) * Math.PI * 2 * ratio);
-          // Low, softly detuned vowel-like voices with a little filtered breath.
-          wave = .43*voice(1) + .31*voice(1.004) + .16*voice(.5) + .09*smoothNoise;
-          break;
-        }
-        case 'velvet': phase = (phase + phaseStep) % 1; wave = .4*sine(.998) + .18*sine(1.002) + .08*oscillator.sample(phase); break;
-        case 'orbit': wave = (.4*sine(1) + .16*sine(1.004) + .07*sine(3))*(.85+.15*Math.cos(time*Math.PI*2*.7)); break;
-        case 'circuitWeave': wave = .34*sine(1) + (.12+.16*magnitude)*sine(2.01) + .14*sine(3.98+eventTone*.01) + .08*sine(7.02+(eventSeed%9)*.002); break;
-        case 'signalLoom': { const pulse=.5+.5*Math.sin(time*Math.PI*2*(2.2+magnitude*2.4)+(eventSeed%100)/100); wave=(.36*sine(1)+.2*sine(1.5)+.12*sine(2.5))*(.58+.42*pulse); break; }
-        case 'neonPulse': { const pulse=Math.exp(-time*(7+magnitude*7))*(1+.35*Math.sin(time*Math.PI*2*(13+magnitude*11))); wave=(.38*sine(1)+(.08+.12*magnitude)*sine(2.03))*pulse; break; }
-        case 'threadResonance': { const detune=.001+(magnitude*.003); wave=.34*sine(1-detune)+.31*sine(1+detune)+.13*sine(2.006)+.06*sine(3.01); break; }
-        case 'nodeChoir': {
-          wave=0;
-          for(let step=0;step<preset.steps.length;step++){const order=subtype==='receive'?preset.steps.length-1-step:step,age=time-step*(.18+magnitude*.1);if(age>=0)wave+=(.2+.1*magnitude)*Math.sin(age*pitch*noteRatios[order]*Math.PI*2)*Math.min(1,age/.08)*Math.exp(-age*2.8)}
-          break;
-        }
-        default: wave = .45*sine(1) + .2*sine(1.005) + .15*sine(3);
-      }
-      if (outside) {
-        // A breath of filtered static swells in, then dissolves. It marks
-        // missing source history, not an unconfirmed or incomplete transfer.
-        noiseSeed = (Math.imul(noiseSeed, 1664525) + 1013904223) >>> 0;
-        const noise = noiseSeed / 2147483648 - 1;
-        const progress = Math.min(1, time / noiseLength);
-        // A clear down-sweep gives the outside receive its own airy arrival
-        // gesture in every sound set. Longer flights sweep more slowly and
-        // finish darker, in time with the comet's travel.
-        const sweep = progress * progress * (3 - 2 * progress);
-        const cutoff = startCutoff * Math.pow(cutoffRatio, sweep);
-        const coefficient = 1 - Math.exp(-2 * Math.PI * cutoff / rate);
-        smoothNoise += coefficient * (noise - smoothNoise);
-        const lowCutoff = cutoff * .52;
-        lowNoise += (1 - Math.exp(-2 * Math.PI * lowCutoff / rate)) * (smoothNoise - lowNoise);
-        const bandNoise = smoothNoise - lowNoise;
-        const swell = Math.sin(Math.PI * progress) ** 1.35;
-        const sweepHz = pitch * swooshOctave * (2.8 * Math.pow(.28, sweep));
-        swooshPhase = (swooshPhase + sweepHz / rate) % 1;
-        samples[i] = .25 * wave * envelope + (.72 * bandNoise + .272 * Math.sin(swooshPhase * Math.PI * 2)) * swell * lfo;
-      } else samples[i] = wave * envelope;
+      }).finally(() => {
+        if (generation === synthesisGeneration) preparingVoices--;
+      });
+      return true;
     }
+
+    const synthStarted = perf ? performance.now() : 0;
+    const buffer = owner.createBuffer(1, Math.ceil(rate * duration), rate);
+    buildLegacySoundSamples(cue, buffer.getChannelData(0));
     if (perf) {
       const elapsed = performance.now() - synthStarted;
       perf.record('synthesis', elapsed);
       perf.record(outside ? 'outsideReceiveSynthesis' : 'toneSynthesis', elapsed);
-      perf.record('generatedBufferBytes', length * Float32Array.BYTES_PER_ELEMENT);
+      perf.record('generatedBufferBytes', buffer.length * Float32Array.BYTES_PER_ELEMENT);
     }
-    const source = context.createBufferSource(), gain = context.createGain();
-    // Lift tonal cues across every preset without changing outside-receive swooshes.
-    const level = outside ? 1 : 3;
-    source.buffer = buffer; gain.gain.value = level * Math.max(0, Math.min(volume, 0.2)) / Math.sqrt(1 + voices.size);
-    source.connect(gain); gain.connect(masterGain); voices.add(source);
-    const owner = context, startedAt = owner.currentTime;
-    // A frozen audio clock may never deliver ended, even while state says running.
-    const expiry = setTimeout(() => {
-      try { source.stop(); } catch {}
-      source.onended?.();
-      if (context === owner && Number.isFinite(startedAt) && owner.currentTime === startedAt) {
-        release();
-        onStatus('Audio paused · waiting for the next sound or user interaction.');
-      }
-    }, duration * 1000 + 1000);
-    source.onended = () => {
-      clearTimeout(expiry);
-      voices.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size}); source.onended = null;
-      perf?.event('voiceEnded');
-      source.disconnect(); gain.disconnect(); source.buffer = null;
-    };
-    source.start();
-    perf?.event('voiceStarted');
-    perf?.record('activeVoices', voices.size);
+    startLegacyVoice(buffer);
     return true;
+
+    function startLegacyVoice(buffer) {
+      const source = context.createBufferSource(), gain = context.createGain();
+      // Lift tonal cues across every preset without changing outside-receive swooshes.
+      const level = outside ? 1 : 3;
+      source.buffer = buffer; gain.gain.value = level * Math.max(0, Math.min(volume, 0.2)) / Math.sqrt(1 + voices.size);
+      source.connect(gain); gain.connect(masterGain); voices.add(source);
+      const startedAt = owner.currentTime;
+      // A frozen audio clock may never deliver ended, even while state says running.
+      const expiry = setTimeout(() => {
+        try { source.stop(); } catch {}
+        source.onended?.();
+        if (context === owner && Number.isFinite(startedAt) && owner.currentTime === startedAt) {
+          release();
+          onStatus('Audio paused · waiting for the next sound or user interaction.');
+        }
+      }, duration * 1000 + 1000);
+      source.onended = () => {
+        clearTimeout(expiry);
+        voices.delete(source);globalThis.netloomPerf?.event('voiceEnded',{voices:voices.size}); source.onended = null;
+        perf?.event('voiceEnded');
+        source.disconnect(); gain.disconnect(); source.buffer = null;
+      };
+      source.start();
+      if (perf) {
+        const scheduleMs = performance.now() - requestedAt;
+        perf.record('cueScheduleLatency', scheduleMs);
+        perf.record('estimatedCueOnset', scheduleMs + 1000 * ((owner.baseLatency ?? 0) + (owner.outputLatency ?? 0)));
+      }
+      perf?.event('voiceStarted');
+      perf?.record('activeVoices', voices.size);
+    }
   }
-  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>{let rms=null,peak=null;if(outputProbe){const samples=new Float32Array(outputProbe.fftSize);outputProbe.getFloatTimeDomainData(samples);rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);peak=samples.reduce((peak,x)=>Math.max(peak,Math.abs(x)),0)}return {rms,peak,state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size,retiring:retiringVoices.size,preparing:preparingVoices,workerJobs:synthesisWorker?.pending||0,workerEnabled:!!synthesisWorker&&!workerFailed,workerActive:synthesisWorker?.active||false,effectsBuses:sharedEffects?1:0,effectTails:effectTails.size,cacheEntries:sampleCache.size,cacheBytes:sampleCacheBytes}}};
+  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>{let rms=null,peak=null;if(outputProbe){const samples=new Float32Array(outputProbe.fftSize);outputProbe.getFloatTimeDomainData(samples);rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);peak=samples.reduce((peak,x)=>Math.max(peak,Math.abs(x)),0)}return {rms,peak,state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size,retiring:retiringVoices.size,preparing:preparingVoices,workerJobs:(legacyWorker??synthesisWorker)?.pending||0,workerEnabled:legacyWorker?!legacyWorkerFailed:!!synthesisWorker&&!workerFailed,workerActive:(legacyWorker??synthesisWorker)?.active||false,effectsBuses:sharedEffects?1:0,effectTails:effectTails.size,cacheEntries:sampleCache.size,cacheBytes:sampleCacheBytes}}};
 }
