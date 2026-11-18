@@ -88,7 +88,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <script src="js/event-utils.js"></script>
 <script src="js/event-cache.js"></script>
 <script src="js/nano-feed.js?v=event-filter-1"></script>
-<script src="js/sound-fx.js?v=volume-200-status"></script>
+<script src="js/starmap-perf.js"></script>
+<script src="js/sound-fx.js?v=starmap-perf-1"></script>
 <script src="js/logo-gravity.js"></script>
 <script src="js/stress-demo.js"></script>
 <script src="js/stardust-wake.js"></script>
@@ -100,7 +101,8 @@ let isDemo=false,nPend=0,rpc='',rpcFail=0,feedClient=null;const sendBy=new Map()
 const RPCS={'ws.nano.to':'https://rpc.nano.to','rainstorm.city':'https://rainstorm.city/api','node.somenano.com':'https://node.somenano.com/proxy','socket.nanos.cc':'https://proxy.nanos.cc/proxy','ws.powernode.cc':'https://proxy.powernode.cc/proxy'};
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 let W=1,H=1,dpr=1,winMs=30*6e4,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
-const soundFX=createSoundFX({onStatus:message=>{$('audioState').textContent=message}});
+const starmapPerf=window.starmapPerf;
+const soundFX=createSoundFX({perf:starmapPerf,onStatus:message=>{$('audioState').textContent=message}});
 const soundVolume=$('soundVolume'),soundVolumeValue=$('soundVolumeValue');
 try{const saved=localStorage.getItem('ag-sound-volume');if(saved!==null&&Number.isFinite(Number(saved)))soundVolume.value=saved}catch{}
 soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);soundVolumeValue.textContent=soundVolume.value+'%';
@@ -110,8 +112,8 @@ try{const saved=localStorage.getItem('ag-sound-set');if([...soundSet.options].so
 soundFX.setSoundSet(soundSet.value);
 soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('ag-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
 let stressPlayback=null;
-const timeScale=()=>stressPlayback?30:1;
-const stressTime=()=>stressPlayback.started===null?0:Math.min(stressPlayback.duration+8000,(performance.now()-stressPlayback.started)*30);
+const timeScale=()=>stressPlayback?.rate??1;
+const stressTime=()=>stressPlayback.started===null?0:Math.min(stressPlayback.duration+8000,(performance.now()-stressPlayback.started)*timeScale());
 const stressElapsed=()=>Math.min(stressPlayback.duration,stressTime());
 const timeNow=()=>stressPlayback?stressPlayback.epoch+stressTime():Date.now();
 const animationNow=()=>stressPlayback?stressPlayback.origin+stressTime():performance.now();
@@ -328,10 +330,10 @@ if(c.hash&&dupS.has(String(c.hash).toUpperCase()))return;rememberHash(c.hash);se
 onStatus:t=>status(t,t.startsWith('Connecting')||t.includes('reconnecting')?'':'on'),
 onGap:()=>{}
 })}
-function startStress(paused=new URLSearchParams(location.search).get('stress')==='ready'){
+function startStress(paused=new URLSearchParams(location.search).get('stress')==='ready', rate=30){
 clearAll();isDemo=true;rpc='';
 $('stressReplay').hidden=false;
-stressPlayback={...createStressDemo(),started:paused?null:performance.now(),epoch:Date.now(),origin:performance.now(),index:0,random:seededRandom(47)};
+stressPlayback={...createStressDemo(),rate,started:paused?null:performance.now(),epoch:Date.now(),origin:performance.now(),index:0,random:seededRandom(47)};
 status('STRESS DEMO · 1,000 transfers / 100 fictional accounts · 5 minutes in 10 seconds','sim');
 }
 function advanceStress(){
@@ -346,6 +348,29 @@ window.starmapStress={
 start(){stop();$('host').value='stress';startStress(false)},
 state(){return stressPlayback?{elapsed:stressElapsed(),events:stressPlayback.index,total:stressPlayback.events.length,accounts:nodes.size,complete:stressElapsed()>=stressPlayback.duration,points:[...nodes.values()].map(p=>({x:p.x,y:p.y,n:p.n})),groups:[...nanoLogoAssignments.values()]}:null}
 };
+starmapPerf?.attach({
+  async prepare(audio){
+    if(audio){
+      try { await soundFX.enable(); }
+      catch { throw new Error('Enable Sound from the page before starting an audio capture.'); }
+    } else soundFX.disable();
+    $('snd').checked=audio;
+    $('snd').dispatchEvent(new Event('input'));
+  },
+  start(outsideReceives, rate){
+    stop();$('host').value='stress';startStress(false, rate);
+    if(outsideReceives){
+      // Keep the workload and event times, but remove receive source matches.
+      for(const {message} of stressPlayback.events){
+        if(message.block.subtype==='receive')message.block.link='';
+      }
+    }
+  },
+  conditions:()=>({preset:soundSet.value,volumePercent:Number(soundVolume.value),sparkles:sparkles.checked,
+    reducedMotion:RM,windowMs:winMs}),
+  state:()=>({audio:soundFX.diagnostics(),events:stressPlayback?.index??0,
+    totalEvents:stressPlayback?.events.length??0,accounts:nodes.size,links:edges.size}),
+});
 $('stressReplay').onclick=()=>window.starmapStress.start();
 const gauss=()=>Math.sqrt(-2*Math.log(1-random()))*Math.cos(6.2832*random());
 function demo(){
