@@ -41,16 +41,17 @@ function createStardustWake({random=Math.random,reducedMotion=false,maxWakes=160
     PX=G.sx+G.dx*along-G.uy*side;PY=G.sy+G.dy*along+G.ux*side}
   function alpha(w,p,pn){const ms=pn-p.bt,slow=1-(ms/p.life)**2,twinkle=reducedMotion?1:.8+.2*Math.sin(pn*.0035+p.tw*9);
     return clamp(ms/120,0,1)*(.16+.7*Math.exp(-ms/1600))*slow*twinkle*w.f}
-  function glitter(ctx,w,p,pn,k,sizeScale,brightness){const t=pn-p.tt;if(t>p.gl)return;const q=t/p.gl;place(w,p,pn,k);
+  function glitter(ctx,w,p,pn,k,sizeScale,brightness,highlight){const t=pn-p.tt;if(t>p.gl)return;const q=t/p.gl;place(w,p,pn,k);
     if(!reducedMotion){const G=w.g,r=p.gs*(1-Math.exp(-t/320))*k,vx=Math.cos(p.ga)+.6,vy=Math.sin(p.ga);PX+=(G.ux*vx-G.uy*vy)*r;PY+=(G.uy*vx+G.ux*vy)*r}
     const sp=reducedMotion?1:Math.max(0,Math.sin(t*p.gw+p.gp))**5,flash=Math.max(0,1-t/90),I=Math.min(1,Math.max(.22+.78*sp,flash))*(1-q)**1.5*w.f,ci=q<.2?0:q<.6?1:2,z=(p.st?10:5)*(.6+.8*I)*(1-q*.4)*sizeScale;
-    if(I<.01)return;ctx.globalAlpha=Math.min(1,I*brightness);ctx.drawImage((p.st&&(sp>.5||flash>0)?star:glow)[ci],PX-z/2,PY-z/2,z,z)}
-  function draw(ctx,pn,X,Y,k,sizeScale=1,brightness=1){if(!wakes.length)return;if(!glow){glow=TINT.map(c=>sprite(false,c));star=TINT.map(c=>sprite(true,c))}
+    if(I<.01)return;ctx.globalAlpha=Math.min(1,I*brightness);
+    if(highlight&&ctx.globalAlpha>.45)highlight(PX,PY,z,ctx.globalAlpha,true);ctx.drawImage((p.st&&(sp>.5||flash>0)?star:glow)[ci],PX-z/2,PY-z/2,z,z)}
+  function draw(ctx,pn,X,Y,k,sizeScale=1,brightness=1,highlight=null){if(!wakes.length)return;if(!glow){glow=TINT.map(c=>sprite(false,c));star=TINT.map(c=>sprite(true,c))}
     for(const w of wakes){const sx=X(w.s.x),sy=Y(w.s.y),dx=X(w.d.x)-sx,dy=Y(w.d.y)-sy,len=Math.hypot(dx,dy)||1;w.g={sx,sy,dx,dy,ux:dx/len,uy:dy/len,len};w.f=w.kill<0?1:clamp(1-(pn-w.kill)/FADE_OUT,0,1)}
     ctx.globalCompositeOperation='lighter';
     for(let c=0;c<4;c++){ctx.fillStyle=`rgb(${DUST[c]})`;for(const w of wakes)for(const p of w.dust){if(p.c!==c||p.m||pn>=p.tt)continue;const a=alpha(w,p,pn);if(a<.01)continue;place(w,p,pn,k);ctx.globalAlpha=Math.min(1,a*brightness);const z=p.z*sizeScale;ctx.fillRect(PX-z/2,PY-z/2,z,z)}}
-    for(const w of wakes)for(const p of w.dust){if(pn>=p.tt){glitter(ctx,w,p,pn,k,sizeScale,brightness);continue}if(!p.m)continue;
-      const a=alpha(w,p,pn)*(reducedMotion?.7:.55+.45*Math.sin(pn*.006+p.tw*9));if(a<.02)continue;const z=(3+p.z*2)*sizeScale;place(w,p,pn,k);ctx.globalAlpha=Math.min(1,a*brightness);ctx.drawImage(glow[0],PX-z/2,PY-z/2,z,z)}
+    for(const w of wakes)for(const p of w.dust){if(pn>=p.tt){glitter(ctx,w,p,pn,k,sizeScale,brightness,highlight);continue}if(!p.m)continue;
+      const a=alpha(w,p,pn)*(reducedMotion?.7:.55+.45*Math.sin(pn*.006+p.tw*9));if(a<.02)continue;const z=(3+p.z*2)*sizeScale;place(w,p,pn,k);ctx.globalAlpha=Math.min(1,a*brightness);if(highlight&&ctx.globalAlpha>.35)highlight(PX,PY,z,ctx.globalAlpha,false);ctx.drawImage(glow[0],PX-z/2,PY-z/2,z,z)}
     ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   }
   function clear(){wakes.length=0;byHash.clear();live=0}

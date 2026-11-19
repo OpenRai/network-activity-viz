@@ -53,6 +53,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 .reading strong{font-weight:600;color:#6ee2f0}
 .reading .activity{color:#f6c744}
 .reading .recency{color:#d282ff}
+.hdr-setting[hidden]{display:none}
+.hdr-highlights{position:absolute;inset:0 0 68px;width:100%;height:calc(100% - 68px);pointer-events:none;dynamic-range-limit:no-limit}
 </style>
 <link rel="stylesheet" href="styles/visualization-credit.css?v=starmap-reveal">
 </head>
@@ -64,6 +66,7 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <input id="snd" type="checkbox" hidden>
 <label class="r">Volume <input id="soundVolume" type="range" min="0" max="200" step="10" value="100"><span id="soundVolumeValue">100%</span></label>
 <label class="r">Sound set <select id="soundSet"><option value="ascent" selected>Starlight ascent · arpeggio</option><option value="aurora">Aurora silk</option><option value="cascade">Moonlit cascade · arpeggio</option><option value="velvet">Velvet nebula</option><option value="orbit">Orbital shimmer</option></select></label>
+<label id="hdrSetting" class="r hdr-setting" hidden></label>
 <div id="audioState" class="n" role="status"></div>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
 <label class="r">Node <select id="host">
@@ -82,26 +85,29 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 </div>
 </details>
 </div>
+<script src="js/hdr-highlights.js?v=hdr-7"></script>
 <script src="js/hud-card.js?v=shared-sound-2"></script>
 <script src="js/gallery-nav.js?v=shared-nav-2"></script>
 <script src="js/map-controls.js?v=guard-2"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/event-cache.js"></script>
+<script src="js/page-settings.js?v=memory-1"></script>
 <script src="js/nano-feed.js?v=event-filter-1"></script>
 <script src="js/starmap-perf.js"></script>
 <script src="js/starmap-audio-worker-client.js"></script>
 <script src="js/sound-fx.js?v=starmap-worker-1"></script>
 <script src="js/logo-gravity.js"></script>
 <script src="js/stress-demo.js"></script>
-<script src="js/stardust-wake.js"></script>
+<script src="js/stardust-wake.js?v=hdr-2"></script>
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
 const cv=$('c'),cx=cv.getContext('2d'),wc=$('w'),wx=wc.getContext('2d'),tc=$('t'),tx=tc.getContext('2d'),ov=$('o'),ox=ov.getContext('2d');
 let isDemo=false,nPend=0,rpc='',rpcFail=0,feedClient=null;const sendBy=new Map(),want=new Map();
 const RPCS={'ws.nano.to':'https://rpc.nano.to','rainstorm.city':'https://rainstorm.city/api','node.somenano.com':'https://node.somenano.com/proxy','socket.nanos.cc':'https://proxy.nanos.cc/proxy','ws.powernode.cc':'https://proxy.powernode.cc/proxy'};
+const hdr=createHdrHighlights(ov,$('hdrSetting'),'ag-hdr');
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
-let W=1,H=1,dpr=1,winMs=30*6e4,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
+let W=1,H=1,dpr=1,winMs=gallerySettings.memoryMs,seen=0,cnt={},lastMsg=0,last=null,timer=0,nSends=0,hubs=[],hover=null,lastPrune=0;
 const starmapPerf=window.starmapPerf;
 const soundFX=createSoundFX({perf:starmapPerf,starmapWorker:new URLSearchParams(location.search).get('workerSynthesis')==='1',onStatus:message=>{$('audioState').textContent=message}});
 const soundVolume=$('soundVolume'),soundVolumeValue=$('soundVolumeValue');
@@ -173,7 +179,7 @@ comets.push({s:h.e.s,d:h.e.d,t0,du,la,x:h.x,kind,txt:fmt(h.x,h.raw)+tag+', recei
 const r=node(a),an=random()*6.283;r.k.push(t);r.n++;r.last=t;
 if(!animate)return;
 const flightDuration=RM?1:1100;
-comets.push({s:{x:r.x+Math.cos(an)*240,y:r.y+Math.sin(an)*240},d:r,t0:animationNow(),du:flightDuration,la,x,kind,txt:fmt(x,raw)+tag+', received'});
+comets.push({s:{x:r.x+Math.cos(an)*240,y:r.y+Math.sin(an)*240},d:r,t0:animationNow(),du:flightDuration,la,x,kind,outside:true,txt:fmt(x,raw)+tag+', received'});
 soundFX.play({frequency:196*2**(clamp((la+8)/13,0,1)*3),volume:.09,outside:true,duration:flightDuration/1000,account:a});
 if(src&&rpc&&rpcFail<3){want.set(src,{r,t,x});if(want.size>500)want.delete(want.keys().next().value)}}
 function mark(a,kind,t,animate=true){const p=node(a);p.k.push(t);p.n++;p.last=t;if(!animate)return;p.pulse=1;
@@ -276,16 +282,23 @@ function drawStellarExits(now){
   }
   cx.globalAlpha=1;
 }
-function drawWake(pn){wx.setTransform(dpr,0,0,dpr,0,0);wx.clearRect(0,0,W,H);if(!sparkles.checked)return;stardust.update(pn);stardust.draw(wx,pn,X,Y,cam.s,starScale()/fittedScale,starBrightness())}
+let dustHighlights=0;
+function addDustHighlight(x,y,size,opacity,dispersed){
+if(dustHighlights>=32)return;
+if(hdr.add(x,y,Math.max(1.5,size*.32),Math.sqrt(opacity),W,H,dispersed?3.8:3.0))dustHighlights++;
+}
+function drawWake(pn){dustHighlights=0;wx.setTransform(dpr,0,0,dpr,0,0);wx.clearRect(0,0,W,H);if(!sparkles.checked)return;stardust.update(pn);stardust.draw(wx,pn,X,Y,cam.s,starScale()/fittedScale,starBrightness(),hdr.active()?addDustHighlight:null)}
 function drawComets(pn){
 // Rebuild short trails each frame. Repeated alpha erasure can leave permanent
 // low-alpha pixels through rounding, which become visible as ghostly smears.
 tx.setTransform(dpr,0,0,dpr,0,0);tx.clearRect(0,0,W,H);tx.globalCompositeOperation='source-over';
+const hdrActive=hdr.active();
 for(let i=comets.length-1;i>=0;i--){const c=comets[i],u=(pn-c.t0)/c.du;
-if(u>=1){comets.splice(i,1);c.d.pulse=1;if(bursts.length<120)bursts.push({d:c.d,t0:pn,la:c.la,kind:c.kind});const tt=c.txt===undefined?fmt(c.x,c.raw):c.txt;if(tt&&floats.length<60)floats.push({d:c.d,t0:pn,txt:tt,kind:c.kind});continue}
+if(u>=1){comets.splice(i,1);c.d.pulse=1;if(bursts.length<120)bursts.push({d:c.d,t0:pn,la:c.la,kind:c.kind,outside:c.outside});const tt=c.txt===undefined?fmt(c.x,c.raw):c.txt;if(tt&&floats.length<60)floats.push({d:c.d,t0:pn,txt:tt,kind:c.kind});continue}
 const sz=clamp(12+(c.la+6)*2,12,30)*starScale()/fittedScale;
 for(let j=RM?0:8;j>=0;j--){const past=u-j*22/c.du;if(past<0)continue;
 const e=past*past*(3-2*past),px=X(c.s.x+(c.d.x-c.s.x)*e),py=Y(c.s.y+(c.d.y-c.s.y)*e);
+if(hdrActive&&j===0&&c.outside)hdr.add(px,py,Math.max(5,sz*.32),1,W,H,3.5);
 tx.globalAlpha=j===0?.75:.08*(1-j/9);tx.drawImage(KS[c.kind||'send'],px-sz/2,py-sz/2,sz,sz)}
 tx.globalAlpha=1}
 }
@@ -302,6 +315,7 @@ ox.fillStyle='#e6ecff';ox.font='17px "Bahnschrift","DIN Alternate","Arial Narrow
 ox.fillStyle='#8f98c4';ox.font='13px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif';ox.fillText($('stt').textContent+(seen?`, ${seen} confirmations seen so far`:''),cxm,H/2+46);ox.font='11px "Bahnschrift","DIN Alternate","Arial Narrow",sans-serif'}
 ox.globalCompositeOperation='lighter';
 for(let i=bursts.length-1;i>=0;i--){const b=bursts[i],a=(pn-b.t0)/1300;if(a>=1){bursts.splice(i,1);continue}
+if(b.outside&&a<.24&&hdr.active())hdr.add(X(b.d.x),Y(b.d.y),10+a*34,1-a/.24,W,H,4.5);
 ox.strokeStyle=`rgba(${RC[b.kind||'send']},${(1-a)*.8})`;ox.lineWidth=1.5;ox.beginPath();ox.arc(X(b.d.x),Y(b.d.y),(10+clamp((b.la+6)*5,0,40))*a*starScale()+4,0,6.283);ox.stroke()}
 ox.globalCompositeOperation='source-over';
 ox.fillStyle='#b9c4f2';for(const p of hubs)ox.fillText(short(p.a),X(p.x),Y(p.y)+accountRadius(p)*starScale()*1.5+10);
@@ -314,7 +328,7 @@ const wallNow=pn;
 pn=animationNow();advanceStress();
 const now=timeNow(),steps=stressPlayback&&stressTime()>=stressPlayback.duration+8000?0:timeScale();
 for(let step=0;step<steps;step++)layout();if(now-lastPrune>1000){prune(now,wallNow);lastPrune=now}
-fitCamera();drawBackground(pn);drawEdges(now);drawAccounts(now);drawStellarExits(wallNow);drawWake(pn);drawComets(pn);drawOverlay(pn,now);
+fitCamera();drawBackground(pn);drawEdges(now);drawAccounts(now);drawStellarExits(wallNow);drawWake(pn);drawComets(pn);drawOverlay(pn,now);hdr.draw(W,H,dpr);
 requestAnimationFrame(frame)}
 
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
@@ -406,7 +420,7 @@ $('stats').textContent=`${nodes.size} accounts, ${edges.size} links, ${nSends} s
 `\nStream: ${lastMsg?Math.round((now-lastMsg)/1e3)+' s since the last message':'no messages yet'}`+(bd?`\nConfirmations seen: ${bd}`:'')+`\nSender lookup for older receives: ${rpc?(rpcFail>=3?'off after errors':'on'):'off, no RPC URL for this node'}`+
 (last?`\nLatest: ${fmt(last.x,last.raw)}, ${short(last.sa)} to ${short(last.da)}`:'')}
  $('host').onchange=()=>{clearAll();connect()};
-$('win').onchange=e=>{winMs=+e.target.value*6e4;prune(timeNow())};
+gallerySettings.onMemoryChange(()=>{winMs=gallerySettings.memoryMs;prune(timeNow())});
 bindHudSound(soundFX);
 addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 addEventListener('click',e=>{if(hover&&!cameraControls.isGesture()&&!e.target.closest('#hud-shell')&&navigator.clipboard){navigator.clipboard.writeText(hover.a).catch(()=>{});floats.push({d:hover,t0:animationNow(),txt:'address copied'})}});

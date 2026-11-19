@@ -6,8 +6,9 @@ const drawSource=html.slice(html.indexOf("const VIEW = 'eventsky';")).split('</s
 function renderEventsky(blocks,{width=1000,time=20000,windowMs=60000,transfers=[]}={}){
  const hits=[],radii=[];
  const state={time,windowMs};
+ const document={getElementById:()=>({style:{}})};
  const ctx=new Proxy({}, {get:()=>()=>{},set:()=>true});
- const context=vm.createContext({performance:{now:()=>1000},reducedMotion:true,state,ctx,hits,colors:{send:'amber',receive:'mint',line:'line',muted:'muted'},logAmount:raw=>Math.log10(Number(raw))-30,line(){},text(){},empty(){},short:s=>s,visualItem:(key,x,y,color,paint)=>paint(),mark:(block,x,y,radius)=>{hits.push({block});radii.push(radius)},dot(){}});
+ const context=vm.createContext({document,performance:{now:()=>1000},reducedMotion:true,state,ctx,hits,colors:{send:'amber',receive:'mint',line:'line',muted:'muted'},logAmount:raw=>Math.log10(Number(raw))-30,line(){},text(){},empty(){},short:s=>s,visualItem:(key,x,y,color,paint)=>paint(),mark:(block,x,y,radius)=>{hits.push({block});radii.push(radius)},dot(){}});
  vm.runInContext(drawSource,context);
  context.draw({blocks,transfers,byHash:new Map(blocks.map(b=>[b.hash,b]))},width,640);
  return {hashes:hits.map(h=>h.block.hash),radii,byHash:new Map(hits.map((h,i)=>[h.block.hash,radii[i]]))};

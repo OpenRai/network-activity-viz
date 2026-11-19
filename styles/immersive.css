@@ -53,3 +53,21 @@ body::before{position:fixed;inset:0;z-index:0;pointer-events:none;content:"";bac
  .signals{bottom:83px;gap:11px}.vote-signal{max-width:135px}.vote-signal span{max-width:125px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+#now-accent{display:none}
+@media (dynamic-range: high) {
+ @supports (background-color: color(rec2100-linear 0.9 1.6 1.4)) {
+  body:is([data-theme="atlas"],[data-theme="eventsky"]) #gallery-nav a[aria-current="page"]::before,
+  body[data-theme="atlas"] #detail::before,
+  #now-accent{
+   background-color:color(rec2100-linear .9 1.6 1.4);
+   dynamic-range-limit:no-limit;
+  }
+  body[data-theme="atlas"] #detail::before{
+   content:"";position:absolute;left:-2px;top:13px;width:2px;height:13px;border-radius:2px;
+  }
+  #now-accent{
+   display:block;position:fixed;z-index:2;width:2px;height:9px;border-radius:2px;pointer-events:none;
+  }
+ }
+}

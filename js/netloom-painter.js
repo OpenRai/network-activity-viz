@@ -30,6 +30,7 @@ const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':'Ӿ'+(x>=.001&&x<1e
  const {cells,receives}=scene;
  const visibility=createNetloomVisibility(viewMatrix,w,h);let marksDrawn=0,labelsDrawn=0;
  const labels=[];
+ const hdrPulses=frame.hdr ? [] : null;
  const progress=smoothScene?Math.max(0,Math.min(1,(now-scene.at)/100)):1;
  let maxStep=0;
  for(const cell of cells){
@@ -57,10 +58,13 @@ const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':'Ӿ'+(x>=.001&&x<1e
   const fade=mode==='linear'?intensity:mode==='log'?Math.log1p(intensity*9)/Math.log(10):Math.sqrt(intensity);
   const visible=!cullScene||visibility.intersects(x-5,y-height/2-5,width+10,height+10);
   if(visible){marksDrawn++;
-  c.globalAlpha=fade;c.fillStyle=color;if(warm&&seed%11===0){c.beginPath();c.arc(x+width/2,y,height*.8,0,Math.PI*2);c.fill()}else c.fillRect(x,y-height/2,width,height);
+  const round=warm&&seed%11===0;
+  c.globalAlpha=fade;c.fillStyle=color;if(round){c.beginPath();c.arc(x+width/2,y,height*.8,0,Math.PI*2);c.fill()}else c.fillRect(x,y-height/2,width,height);
   if(seed%5===0){c.fillStyle='#b3f7ff';c.fillRect(x+2,y-height/2,Math.max(3,width*.4),1)}
   l.globalAlpha=fade*(warm?.8:.45);l.fillStyle=color;l.fillRect(x-2,y-height/2-2,width+4,height+4);
-  if(!RM&&age<900){const pulse=1-age/900;l.globalAlpha=pulse;l.fillStyle='#d6fbff';l.fillRect(x-5,y-height/2-5,width+10,height+10)}
+  if(!RM&&age<900){const pulse=1-age/900;
+   if(hdrPulses&&age>=0)hdrPulses.push({x:x+width/2,y,halfWidth:round?height*.8:width/2,halfHeight:round?height*.8:height/2,glowRadius:Math.min(11,height*.85),round,at:m.at,pulse});
+   l.globalAlpha=pulse;l.fillStyle='#d6fbff';l.fillRect(x-5,y-height/2-5,width+10,height+10)}
   }
   labels.push({style,x,y,seed,fade,warm});
  }
@@ -79,6 +83,10 @@ const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':'Ӿ'+(x>=.001&&x<1e
  c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.5;c.drawImage(glow,0,0,PLANE_W,PLANE_H);c.restore();
 
 
+  if(hdrPulses) {
+   hdrPulses.sort((a,b)=>b.at-a.at);
+   metrics.hdrPulses=hdrPulses.slice(0,16);
+  } else delete metrics.hdrPulses;
   metrics.duration=performance.now()-started;return metrics;
  }
  return {resize,paint};

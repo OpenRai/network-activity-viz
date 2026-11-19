@@ -1,5 +1,28 @@
-// Shared Node and Memory controls for every gallery page except the starmap.
+// Shared Memory preferences and Node controls.
 (() => {
+  function bindMemory(memory) {
+    const page = location.pathname.split('/').pop();
+    const key = 'nano-gallery-memory:' + page;
+    const options = ['10', '30', '60'];
+    let savedWindow;
+    try { savedWindow = localStorage.getItem(key); } catch {}
+    memory.value = options.includes(savedWindow) ? savedWindow : '30';
+    memory.addEventListener('change', () => {
+      if (!options.includes(memory.value)) return;
+      try { localStorage.setItem(key, memory.value); } catch {}
+    });
+    return {
+      get memoryMs() { return Number(memory.value) * 60000; },
+      onMemoryChange(callback) { memory.addEventListener('change', callback); }
+    };
+  }
+
+  const existingMemory = document.querySelector('#win');
+  if (existingMemory) {
+    window.gallerySettings = bindMemory(existingMemory);
+    return;
+  }
+
   const node = document.querySelector('#feed');
   if (!node) return;
   const hosts = [
@@ -26,19 +49,14 @@
   memory.setAttribute('aria-label', 'Memory window');
   memory.replaceChildren(...[[10,'10 minutes'],[30,'30 minutes'],[60,'60 minutes']]
     .map(([value,label]) => new Option(label, String(value))));
-  let savedWindow;
-  try { savedWindow = localStorage.getItem('nano-gallery-memory'); } catch {}
-  memory.value = ['10','30','60'].includes(savedWindow) ? savedWindow : '30';
   const memoryLabel = document.createElement('label');
   memoryLabel.append('Memory ', memory);
   nodeLabel.after(memoryLabel);
   node.closest('.controls').replaceChildren(nodeLabel, memoryLabel);
 
-  window.gallerySettings = {
-    get memoryMs() { return Number(memory.value) * 60000; },
+  window.gallerySettings = Object.assign(bindMemory(memory), {
     saveNode() { try { if (['demo','stress'].includes(node.value)) localStorage.removeItem('nano-gallery-node'); else localStorage.setItem('nano-gallery-node', node.value); } catch {} },
-    onMemoryChange(callback) { memory.addEventListener('change', callback); },
     onNodeChange(callback) { node.addEventListener('change', callback); }
-  };
+  });
   node.addEventListener('change', () => window.gallerySettings.saveNode());
 })();

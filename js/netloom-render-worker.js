@@ -1,5 +1,5 @@
 'use strict';
-importScripts('netloom-visibility.js','netloom-painter.js?v=currency-prefix');
+importScripts('netloom-visibility.js','netloom-painter.js?v=hdr-4');
 let painter,scene;
 self.onmessage=({data})=>{
  try {

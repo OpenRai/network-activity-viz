@@ -72,6 +72,8 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 #tweakPanel .tp-actions{display:flex;gap:6px;margin-top:8px}
 #tweakPanel .tp-actions button{flex:1;background:#0a1428;border:1px solid var(--line);color:var(--dim);border-radius:3px;padding:3px 0;cursor:pointer;font-size:10px;font:inherit}
 #tweakPanel .tp-actions button:hover{color:var(--cyan);border-color:var(--cyan)}
+.hdr-setting[hidden]{display:none}
+.hdr-highlights{position:absolute;inset:0 0 68px;width:100%;height:calc(100% - 68px);pointer-events:none;dynamic-range-limit:no-limit}
 </style>
 <link rel="stylesheet" href="styles/visualization-credit.css?v=credit-link">
 </head>
@@ -83,6 +85,7 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <input id="snd" type="checkbox" hidden>
 <label class="r">Volume <input id="soundVolume" type="range" min="0" max="200" step="10" value="100"><span id="soundVolumeValue">100%</span></label>
 <label class="r">Sound set <select id="soundSet"><option value="circuitWeave">Circuit Weave</option><option value="signalLoom">Signal Resonance</option><option value="neonPulse" selected>Neon Pulse</option><option value="handsetSolace">Handset Solace</option></select></label>
+<label id="hdrSetting" class="r hdr-setting" hidden></label>
 <div id="audioState" class="n" role="status"></div>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
 <div class="controls"><label>Node <select id="feed"></select></label></div>
@@ -154,9 +157,10 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 </div>
 </div>
 </details>
+<script src="js/hdr-highlights.js?v=hdr-7"></script>
 <script src="js/hud-card.js?v=shared-sound-1"></script>
 <script src="js/gallery-nav.js?v=shared-nav-2"></script>
-<script src="js/page-settings.js"></script>
+<script src="js/page-settings.js?v=memory-1"></script>
 <script src="js/event-utils.js"></script>
 <script src="js/event-cache.js"></script>
 <script src="js/nano-feed.js?v=event-filter-1"></script>
@@ -165,12 +169,12 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <script src="js/sound-fx.js?v=volume-200-status"></script>
 <script src="js/zzfx-parameters.js?v=netloom-sfx-8"></script>
 <script src="js/stress-demo.js"></script>
-<script src="js/netloom-painter.js?v=currency-prefix"></script>
-<script src="js/netloom-renderer.js?v=currency-prefix"></script>
+<script src="js/netloom-painter.js?v=hdr-4"></script>
+<script src="js/netloom-renderer.js?v=hdr-4"></script>
 <script src="js/netloom-camera.js?v=portrait-1"></script>
 <script src="js/netloom-visibility.js"></script>
 <script src="js/map-controls.js?v=guard-2"></script>
-<script src="js/netloom.js?v=currency-prefix"></script>
+<script src="js/netloom.js?v=hdr-7"></script>
 <script>
 (()=>{
   document.getElementById('tweakPanel').hidden=new URLSearchParams(location.search).get('tweaks')!=='1';

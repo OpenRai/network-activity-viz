@@ -2,7 +2,9 @@
 const $=id=>document.getElementById(id);
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
 let cv=$('c');const ov=$('o'),ox=ov.getContext('2d');
-const renderer=createNetloomRenderer(cv,{replace:canvas=>{cv=canvas},metrics:metrics=>{if(!globalThis.netloomPerf)return;for(const key of ['bandStepPixels','marksDrawn','labelsDrawn'])netloomPerf.record(key,metrics[key]);netloomPerf.record('canvasBuild',metrics.duration);netloomPerf.record(metrics.thread==='worker'?'workerPaint':'mainPaint',metrics.duration);if(metrics.latency!==undefined)netloomPerf.record('renderLatency',metrics.latency);netloomPerf.event('canvasPaint')}});
+const hdr=createHdrHighlights(ov,$('hdrSetting'),'netloom-hdr');
+let hdrPulses=[];
+const renderer=createNetloomRenderer(cv,{replace:canvas=>{cv=canvas},metrics:metrics=>{hdrPulses=metrics.hdrPulses??[];if(!globalThis.netloomPerf)return;for(const key of ['bandStepPixels','marksDrawn','labelsDrawn'])netloomPerf.record(key,metrics[key]);netloomPerf.record('canvasBuild',metrics.duration);netloomPerf.record(metrics.thread==='worker'?'workerPaint':'mainPaint',metrics.duration);if(metrics.latency!==undefined)netloomPerf.record('renderLatency',metrics.latency);netloomPerf.event('canvasPaint')}});
 let T=gallerySettings.memoryMs,Te=6e4,t0=Date.now(),cnt={},lastMsg=0,mode='sqrt',ev=[],markers=[],feedClient=null,last=null,dpr=1,tx=0,simulation=null;
 const soundFX=createSoundFX({profile:'cyber',onStatus:message=>{$('audioState').textContent=message}}),soundSet=$('soundSet');
 globalThis.netloomSoundFX=soundFX;
@@ -78,7 +80,7 @@ function prepareScene(now){
  lastLayoutAt=now;
 }
 function build(now){
- renderer.paint({scene,now,mode,windowMs:Te,viewport:[w,h],matrix:viewMatrix,dpr,reducedMotion:RM,options:{smoothScene,cullScene,useGridCache}});
+ renderer.paint({scene,now,mode,hdr:hdr.active(),windowMs:Te,viewport:[w,h],matrix:viewMatrix,dpr,reducedMotion:RM,options:{smoothScene,cullScene,useGridCache}});
 }
 
 const fd=ms=>ms>=6e4?Math.round(ms/6e3)/10+' min':Math.round(ms/1e3)+' s';
@@ -98,6 +100,20 @@ function render(){
  const translateX=anchorX+drift-a*ratio*focusX-c*focusY,translateY=anchorY-b*ratio*focusX-d*focusY;
  viewMatrix=[a*ratio*camera.s,b*ratio*camera.s,c*camera.s,d*camera.s,w/2+(translateX-camera.x)*camera.s,h/2+(translateY-camera.y)*camera.s];
  cv.style.transform=`matrix(${a*ratio*camera.s},${b*ratio*camera.s},${c*camera.s},${d*camera.s},${w/2+(translateX-camera.x)*camera.s},${h/2+(translateY-camera.y)*camera.s})`;
+}
+function drawHdr(now){
+ const height=Math.max(1,h-68);
+ if(hdr.active()){
+  const [a,b,c,d,offsetX,offsetY]=viewMatrix;
+  for(const {x,y,halfWidth,halfHeight,glowRadius,round,at,pulse} of hdrPulses){
+   if(now-at>=900)continue;
+   const centerX=a*x+c*y+offsetX,centerY=b*x+d*y+offsetY;
+   const opacity=Math.min(pulse,1-(now-at)/900);
+   hdr.add(centerX,centerY,glowRadius*Math.hypot(a,b),opacity*.55,w,height,1.5);
+   hdr.addSolid(centerX,centerY,a*halfWidth,b*halfWidth,c*halfHeight,d*halfHeight,opacity,w,height,4,round);
+  }
+ }
+ hdr.draw(w,height,dpr);
 }
 function overlay(now){
  ox.clearRect(0,0,w,h);ox.fillStyle=vignette;ox.fillRect(0,0,w,h);ox.font='10px monospace';ox.fillStyle='#598195';ox.textAlign='right';
@@ -119,7 +135,7 @@ if(!silent){const amountPitch=Math.max(0,Math.min(1,(la+8)/13));const pitchPosit
 }
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
 function stop(){simulation=null;if(feedClient){feedClient.stop();feedClient=null}}
-function resetStream(){ev=[];markers=[];cnt={};lastMsg=0;last=null;t0=Date.now();rangeLow=rangeHigh=null;lastB=0;scene=null;lastLayoutAt=0;bandWeights.clear();dupS.clear();dupQ.length=0;sentHashes.clear();sentQueue.length=0}
+function resetStream(){ev=[];markers=[];cnt={};lastMsg=0;last=null;t0=Date.now();rangeLow=rangeHigh=null;lastB=0;scene=null;lastLayoutAt=0;hdrPulses=[];bandWeights.clear();dupS.clear();dupQ.length=0;sentHashes.clear();sentQueue.length=0}
 function restoreCache(){
 for(const event of globalThis.nanoEventCache?.restore()||[]){const item=event.message,block=parseNanoBlock(item.block)||{},sub=block.subtype||'other';if(!['send','receive','open'].includes(sub))continue;
 const at=event.lastSeenAt,hash=event.hash;t0=Math.min(t0,at);dupS.add(hash);dupQ.push(hash);
@@ -176,5 +192,6 @@ const paintDue=now-lastB>=(smoothScene?1000/30-1:100);
 if(paintDue){lastB=now;boardWindow=Te}
 if(globalThis.netloomPerf)netloomPerf.measure("camera",render);else render();
 if(paintDue){if(globalThis.netloomPerf){if(globalThis.netloomPerfDraw!==false)netloomPerf.measure('paintDispatch',()=>build(now))}else build(now)}
+drawHdr(now);
 requestAnimationFrame(loop)})();
 })();
