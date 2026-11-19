@@ -5,6 +5,7 @@ let cv=$('c');const ov=$('o'),ox=ov.getContext('2d');
 const hdr=createHdrHighlights(ov,$('hdrSetting'),'netloom-hdr');
 let hdrPulses=[];
 const renderer=createNetloomRenderer(cv,{replace:canvas=>{cv=canvas},metrics:metrics=>{hdrPulses=metrics.hdrPulses??[];if(!globalThis.netloomPerf)return;for(const key of ['bandStepPixels','marksDrawn','labelsDrawn'])netloomPerf.record(key,metrics[key]);netloomPerf.record('canvasBuild',metrics.duration);netloomPerf.record(metrics.thread==='worker'?'workerPaint':'mainPaint',metrics.duration);if(metrics.latency!==undefined)netloomPerf.record('renderLatency',metrics.latency);netloomPerf.event('canvasPaint')}});
+const HISTORY_MS=60*60*1000;
 let T=gallerySettings.memoryMs,Te=6e4,t0=Date.now(),cnt={},lastMsg=0,mode='sqrt',ev=[],markers=[],feedClient=null,last=null,dpr=1,tx=0,simulation=null;
 const soundFX=createSoundFX({profile:'cyber',onStatus:message=>{$('audioState').textContent=message}}),soundSet=$('soundSet');
 globalThis.netloomSoundFX=soundFX;
@@ -128,7 +129,7 @@ function overlay(now){
  ox.fillText('CONFIRMED BLOCKS / AMOUNT × OBSERVER TIME',right,h-111,w-48);
  ox.fillStyle=gradient;ox.fillRect(right-width,h-104,width,4);
  ox.fillStyle='#285568';ox.fillText('LINKED TRACES / OBSERVED SOURCE',right,h-87,w-48);
- if(!markers.length){ox.fillStyle='#71bbd1';ox.textAlign='center';ox.fillText('WAITING FOR CONFIRMED BLOCKS',w*.58,h*.48)}
+ if(!markers.some(marker=>now-marker.at<=Te)){ox.fillStyle='#71bbd1';ox.textAlign='center';ox.fillText('WAITING FOR CONFIRMED BLOCKS',w*.58,h*.48)}
 }
 
 const dupS=new Set(),dupQ=[],sentHashes=new Set(),sentQueue=[];
@@ -170,7 +171,7 @@ onGap:()=>{}
 });
 }
 function hud(now){
-const cut=now-T;let i=0;while(i<ev.length&&ev[i]<cut)i+=2;if(i){ev=ev.slice(i);}
+const cut=now-HISTORY_MS;let i=0;while(i<ev.length&&ev[i]<cut)i+=2;if(i){ev=ev.slice(i);}
 let first=0;while(first<markers.length&&markers[first].at<cut)first++;if(first)markers=markers.slice(first);
 let n=0,m1=0;
 for(let j=ev.length-2;j>=0;j-=2){const t=ev[j];if(t<now-Te)break;n++;if(t>now-6e4)m1++}
@@ -182,8 +183,17 @@ $('stats').textContent=`${n} sends in view, ${m1} in the last minute\nShowing ${
 (last?`\nLatest: ${fmt(last.x)} ${last.hash.slice(0,8)}`:'');
 }
 
+function updateWindow(now){
+ Te=Math.min(T,Math.max(3000,now-(markers[0]?.at||t0)));
+}
 gallerySettings.onNodeChange(connect);
-gallerySettings.onMemoryChange(()=>{T=gallerySettings.memoryMs;});
+gallerySettings.onMemoryChange(()=>{
+ T=gallerySettings.memoryMs;
+ const now=Date.now();
+ updateWindow(now);
+ lastLayoutAt=lastB=0;
+ hud(now);overlay(now);
+});
 addEventListener('pointermove',e=>{if(!cameraControls.isGesture())tx=e.clientX/innerWidth-.5});
 addEventListener('resize',size);
 addEventListener('pagehide',()=>renderer.dispose());addEventListener('pageshow',()=>renderer.resume());
@@ -192,7 +202,7 @@ if(globalThis.netloomPerf)netloomPerf.attach({state:()=>({markers:markers.length
 size();connect();
 (function loop(){const now=Date.now();
 advanceSimulation(performance.now());
-Te=Math.min(T,Math.max(3000,now-(markers[0]?.at||t0)));
+updateWindow(now);
 if(!scene||now-lastLayoutAt>=100){if(globalThis.netloomPerf)netloomPerf.measure('layout',()=>prepareScene(now));else prepareScene(now)}
 const paintDue=now-lastB>=(smoothScene?1000/30-1:100);
 if(paintDue){lastB=now;boardWindow=Te}

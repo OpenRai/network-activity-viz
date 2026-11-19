@@ -167,7 +167,15 @@ const starScale=()=>cam.s<=fittedScale?cam.s:fittedScale*Math.pow(cam.s/fittedSc
 const starBrightness=()=>1+.3*(1-Math.exp(-Math.max(0,Math.log(cam.s/fittedScale))*.55));
 const cameraControls=createMapControls(tc,cam,()=>({width:W,height:H,cx:W/2+off(),cy:H/2}));
 
-function node(a,near){let p=nodes.get(a);if(!p){const an=random()*6.283,d=near?18:60*random();
+const activityHistory=[];
+const HISTORY_MS=60*60*1000;
+let previousNodes;
+function rememberActivity(at,apply){
+ appendBounded(activityHistory,{at,apply},10000);
+}
+function node(a,near){let p=nodes.get(a);if(!p&&previousNodes?.has(a)){
+p=previousNodes.get(a);p.n=0;p.last=0;p.k.length=0;nodes.set(a,p);
+}if(!p){const an=random()*6.283,d=near?18:60*random();
 p={a,x:(near?near.x:0)+Math.cos(an)*d,y:(near?near.y:0)+Math.sin(an)*d,vx:0,vy:0,fx:0,fy:0,n:0,pulse:0,last:0,k:[]};nodes.set(a,p)}return p}
 function getEdge(s,d){const k=s.a+'>'+d.a;let e=edges.get(k);if(!e){e={s,d,ts:[],am:[],pend:0};edges.set(k,e)}return e}
 function ingest(sa,da,x,t,anim,hash,raw){
@@ -190,23 +198,34 @@ soundFX.play({frequency:196*2**(clamp((la+8)/13,0,1)*3),volume:.09,outside:true,
 if(src&&rpc&&rpcFail<3){want.set(src,{r,t,x});if(want.size>500)want.delete(want.keys().next().value)}}
 function mark(a,kind,t,animate=true){const p=node(a);p.k.push(t);p.n++;p.last=t;if(!animate)return;p.pulse=1;
 if(bursts.length<120)bursts.push({d:p,t0:animationNow(),la:-2,kind});if(floats.length<60)floats.push({d:p,t0:animationNow(),txt:kind==='change'?'representative change':'epoch upgrade',kind})}
-function link(sa,r,x,t0){const s=node(sa,r),e=getEdge(s,r),now=timeNow();e.ts.push(now);e.am.push(x);s.n++;s.last=now;
+function link(sa,r,x,t0,now,animate){const s=node(sa,r),e=getEdge(s,r);e.ts.push(now);e.am.push(x);s.n++;s.last=now;
 const i=r.k.indexOf(t0);if(i>=0)r.k.splice(i,1);
-comets.push({s,d:r,t0:animationNow(),du:RM?1:700,la:Math.log10(x),x,kind:'receive',txt:''})}
+if(animate)comets.push({s,d:r,t0:animationNow(),du:RM?1:700,la:Math.log10(x),x,kind:'receive',txt:''})}
 function handle(c,animate=true,at=timeNow()){
 const b=parseNanoBlock(c.block);if(!b)return;
 const sub=b.subtype||b.type||'other',now=at,x=Number(c.amount)/1e30,a=b.account||c.account,hash=typeof c.hash==='string'?c.hash.toUpperCase():'',source=typeof (b.link||b.source)==='string'?(b.link||b.source).toUpperCase():b.link||b.source;
 cnt[sub]=(cnt[sub]||0)+1;
-if(sub==='send')ingest(a,b.link_as_account||b.destination,x,now,animate,hash,c.amount);
-else if(sub==='receive'||sub==='open')land(a,source,x,now,sub==='open',c.amount,animate);
-else if(sub==='change'||sub==='epoch')mark(a,sub,now,animate)}
+if(sub==='send'||sub==='receive'||sub==='open'||sub==='change'||sub==='epoch'){
+ const apply=animated=>{
+  if(sub==='send')ingest(a,b.link_as_account||b.destination,x,now,animated,hash,c.amount);
+  else if(sub==='receive'||sub==='open')land(a,source,x,now,sub==='open',c.amount,animated);
+  else mark(a,sub,now,animated);
+ };
+ rememberActivity(now,apply);
+ apply(animate);
+}}
 async function resolve(){
 if(!rpc||rpcFail>=3||!want.size)return;
 const hs=[...want.keys()].slice(0,25);
 try{const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'blocks_info',hashes:hs,json_block:'true'})});
 if(!r.ok)throw 0;const j=await r.json();if(!j.blocks)throw 0;rpcFail=0;
 for(const h of hs){const w=want.get(h);want.delete(h);const bi=j.blocks[h];if(!bi||!w)continue;
-const x=Number(bi.amount)/1e30;if(bi.block_account&&bi.block_account!==w.r.a)link(bi.block_account,w.r,x>0?x:w.x,w.t)}}
+const x=Number(bi.amount)/1e30;if(bi.block_account&&bi.block_account!==w.r.a){
+ const at=timeNow(),sender=bi.block_account,recipient=w.r.a,amount=x>0?x:w.x,receivedAt=w.t;
+ const apply=animate=>link(sender,node(recipient),amount,receivedAt,at,animate);
+ rememberActivity(at,apply);
+ apply(true);
+}}}
 catch(e){rpcFail++;if(rpcFail>=3)want.clear()}}
 
 function layout(){
@@ -228,6 +247,8 @@ for(const p of points){const scale=Math.min(1,.2/(Math.hypot(p.linkX,p.linkY)||1
 }
 
 function prune(now,exitAt){
+let expired=0;while(expired<activityHistory.length&&activityHistory[expired].at<now-HISTORY_MS)expired++;
+if(expired)activityHistory.splice(0,expired);
 const cut=now-winMs;nSends=0;nPend=0;
 for(const[k,e]of edges){let i=0;while(i<e.ts.length&&e.ts[i]<cut)i++;if(i){e.ts.splice(0,i);e.am.splice(0,i)}
 if(!e.ts.length)edges.delete(k);else{nSends+=e.ts.length;e.pend=Math.min(e.pend,e.ts.length);nPend+=e.pend}}
@@ -339,7 +360,7 @@ requestAnimationFrame(frame)}
 
 function status(t,c){$('stt').textContent=t;$('dot').className=c||''}
 const dupS=new Set(),dupQ=[];
-function clearAll(){stardust.clear();nodes.clear();edges.clear();sendBy.clear();want.clear();comets.length=bursts.length=floats.length=stellarExits.length=0;seen=0;cnt={};lastMsg=0;last=null;nSends=0;hubs=[];dupS.clear();dupQ.length=0}
+function clearAll(){activityHistory.length=0;stardust.clear();nodes.clear();edges.clear();sendBy.clear();want.clear();comets.length=bursts.length=floats.length=stellarExits.length=0;seen=0;cnt={};lastMsg=0;last=null;nSends=0;hubs=[];dupS.clear();dupQ.length=0}
 function rememberHash(hash){if(!hash)return;hash=String(hash).toUpperCase();if(dupS.has(hash))return;dupS.add(hash);dupQ.push(hash);if(dupQ.length>5000)dupS.delete(dupQ.shift())}
 function stop(){stressPlayback=null;$('stressReplay').hidden=true;clearTimeout(timer);if(feedClient){feedClient.stop();feedClient=null}}
 function connect(){
@@ -411,7 +432,13 @@ else if(r<.66)handle({account:u,amount:raw(amt()),hash:hh(),block:{subtype:'rece
 else if(r<.69)handle({account:u,amount:'0',hash:hh(),block:{subtype:'change',account:u}});
 else send(u,pick(us),amt())};
 const now=timeNow();
-for(let i=0;i<140;i++){const t=now-6e5+i*(6e5/140),r=random();if(r<.4)ingest(pick(us),pick(hb),amt(),t,false);else if(r<.7)ingest(pick(hb),pick(us),amt(),t,false);else ingest(pick(us),pick(us),amt(),t,false)}
+for(let i=0;i<140;i++){
+ const t=now-6e5+i*(6e5/140),r=random();
+ const source=pick(r>=.4&&r<.7?hb:us),destination=pick(r<.4?hb:us),amount=amt();
+ const apply=()=>ingest(source,destination,amount,t,false);
+ rememberActivity(t,apply);
+ apply();
+}
 for(let i=0;i<350;i++)layout();
 let nx=now+30e3;
 const tick=()=>{if(!isDemo)return;const t=timeNow();
@@ -426,7 +453,21 @@ $('stats').textContent=`${nodes.size} accounts, ${edges.size} links, ${nSends} s
 `\nStream: ${lastMsg?Math.round((now-lastMsg)/1e3)+' s since the last message':'no messages yet'}`+(bd?`\nConfirmations seen: ${bd}`:'')+`\nSender lookup for older receives: ${rpc?(rpcFail>=3?'off after errors':'on'):'off, no RPC URL for this node'}`+
 (last?`\nLatest: ${fmt(last.x,last.raw)}, ${short(last.sa)} to ${short(last.da)}`:'')}
  $('host').onchange=()=>{clearAll();connect()};
-gallerySettings.onMemoryChange(()=>{winMs=gallerySettings.memoryMs;prune(timeNow())});
+function setMemoryWindow(windowMs,now){
+ const previousWindow=winMs;
+ winMs=windowMs;
+ if(winMs>previousWindow&&activityHistory.some(({at})=>at>=now-winMs&&at<now-previousWindow)){
+  previousNodes=new Map(nodes);
+  nodes.clear();edges.clear();sendBy.clear();
+  const latest=last;
+  for(const {at,apply} of activityHistory)if(at>=now-winMs)apply(false);
+  last=latest;
+  previousNodes=undefined;
+ }
+ prune(now);
+ hud();
+}
+gallerySettings.onMemoryChange(()=>setMemoryWindow(gallerySettings.memoryMs,timeNow()));
 bindHudSound(soundFX);
 addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 addEventListener('click',e=>{if(hover&&!cameraControls.isGesture()&&!e.target.closest('#hud-shell')&&navigator.clipboard){navigator.clipboard.writeText(hover.a).catch(()=>{});floats.push({d:hover,t0:animationNow(),txt:'address copied'})}});
