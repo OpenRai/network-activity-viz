@@ -115,9 +115,15 @@ try{const saved=localStorage.getItem('ag-sound-volume');if(saved!==null&&Number.
 soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);soundVolumeValue.textContent=soundVolume.value+'%';
 soundVolume.oninput=()=>{soundVolumeValue.textContent=soundVolume.value+'%';soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);try{localStorage.setItem('ag-sound-volume',soundVolume.value)}catch{}};
 const soundSet=$('soundSet');
-try{const saved=localStorage.getItem('ag-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
+const soundSetKey='ag-sound-set-v2';
+try{
+  const saved=localStorage.getItem(soundSetKey);
+  if([...soundSet.options].some(option=>option.value===saved))soundSet.value=saved;
+  else localStorage.setItem(soundSetKey,soundSet.value);
+  localStorage.removeItem('ag-sound-set');
+}catch{}
 soundFX.setSoundSet(soundSet.value);
-soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('ag-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
+soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem(soundSetKey,soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
 let stressPlayback=null;
 const timeScale=()=>stressPlayback?.rate??1;
 const stressTime=()=>stressPlayback.started===null?0:Math.min(stressPlayback.duration+8000,(performance.now()-stressPlayback.started)*timeScale());

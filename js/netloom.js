@@ -12,9 +12,15 @@ const soundVolume=$('soundVolume'),soundVolumeValue=$('soundVolumeValue');
 try{const saved=localStorage.getItem('netloom-sound-volume');if(saved!==null&&Number.isFinite(Number(saved)))soundVolume.value=saved}catch{}
 soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);soundVolumeValue.textContent=soundVolume.value+'%';
 soundVolume.oninput=()=>{soundVolumeValue.textContent=soundVolume.value+'%';soundFX.setVolumeMultiplier(Number(soundVolume.value)/100);try{localStorage.setItem('netloom-sound-volume',soundVolume.value)}catch{}};
-try{const saved=localStorage.getItem('netloom-sound-set');if([...soundSet.options].some(o=>o.value===saved))soundSet.value=saved}catch{}
+const soundSetKey='netloom-sound-set-v2';
+try{
+  const saved=localStorage.getItem(soundSetKey);
+  if([...soundSet.options].some(option=>option.value===saved))soundSet.value=saved;
+  else localStorage.setItem(soundSetKey,soundSet.value);
+  localStorage.removeItem('netloom-sound-set');
+}catch{}
 soundFX.setSoundSet(soundSet.value);
-soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem('netloom-sound-set',soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
+soundSet.onchange=()=>{soundFX.setSoundSet(soundSet.value);try{localStorage.setItem(soundSetKey,soundSet.value)}catch{}if($('snd').checked)soundFX.enable().then(()=>soundFX.play({frequency:440,volume:.12})).catch(()=>{})};
 bindHudSound(soundFX);
 let lastB=0,boardWindow=60000,rangeLow=null,rangeHigh=null,bandWeights=new Map(),drift=0,vignette,w,h,camera={x:0,y:0,s:1},cameraControls;
 const PLANE_W=1600,PLANE_H=1000;

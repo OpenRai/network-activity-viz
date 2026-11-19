@@ -84,7 +84,7 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <summary><h1>Block Threads</h1></summary>
 <input id="snd" type="checkbox" hidden>
 <label class="r">Volume <input id="soundVolume" type="range" min="0" max="200" step="10" value="100"><span id="soundVolumeValue">100%</span></label>
-<label class="r">Sound set <select id="soundSet"><option value="circuitWeave">Circuit Weave</option><option value="signalLoom">Signal Resonance</option><option value="neonPulse" selected>Neon Pulse</option><option value="handsetSolace">Handset Solace</option></select></label>
+<label class="r">Sound set <select id="soundSet"><option value="circuitWeave">Circuit Weave</option><option value="signalLoom">Signal Resonance</option><option value="neonPulse">Neon Pulse</option><option value="handsetSolace" selected>Handset Solace</option></select></label>
 <label id="hdrSetting" class="r hdr-setting" hidden></label>
 <div id="audioState" class="n" role="status"></div>
 <div id="st"><i id="dot"></i><span id="stt">starting</span></div>
@@ -174,7 +174,7 @@ select:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-
 <script src="js/netloom-camera.js?v=portrait-1"></script>
 <script src="js/netloom-visibility.js"></script>
 <script src="js/map-controls.js?v=guard-2"></script>
-<script src="js/netloom.js?v=hdr-7"></script>
+<script src="js/netloom.js?v=sound-default-2"></script>
 <script>
 (()=>{
   document.getElementById('tweakPanel').hidden=new URLSearchParams(location.search).get('tweaks')!=='1';
