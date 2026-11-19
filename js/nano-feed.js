@@ -6,7 +6,7 @@ function createImmediateEventFilter(emit) {
 }
 
 function createSomeNanoEventFilter(emit) {
-  const halfWindow = 2500;
+  const defaultDurationMs = 5000;
   const pending = [];
   let timer = null, stopped = false;
   const hashKey = value => typeof value === 'string' ? value.toUpperCase() : '';
@@ -36,13 +36,17 @@ function createSomeNanoEventFilter(emit) {
   }
 
   return {
-    push(packets, {batched, receivedAt}) {
+    push(packets, {batched, receivedAt, durationMs}) {
       if (stopped) return;
       if (!batched) {
         for(const packet of packets) { if(stopped)break; emit(packet); }
         return;
       }
       if (!packets.length) return;
+      // Keep both halves nonempty and stay within the browser timer range.
+      const windowMs = Number.isInteger(durationMs) && durationMs >= 2 && durationMs <= 2_147_483_647
+        ? durationMs : defaultDurationMs;
+      const halfWindow = Math.floor(windowMs / 2);
       const entries = packets.map(describe);
       const sendHashes = new Set(entries.filter(e=>e.subtype==='send' && e.hash).map(e=>e.hash));
       const pairedSends = new Set(entries.map(e=>e.source).filter(hash=>sendHashes.has(hash)));
@@ -50,7 +54,7 @@ function createSomeNanoEventFilter(emit) {
         const pairedReceive = pairedSends.has(entry.source);
         const pairedSend = entry.subtype === 'send' && pairedSends.has(entry.hash);
         const start = pairedReceive ? halfWindow : 0;
-        const span = pairedReceive || pairedSend ? halfWindow : halfWindow*2;
+        const span = pairedReceive ? windowMs - halfWindow : pairedSend ? halfWindow : windowMs;
         const offset = start + Math.min(span-1, Math.floor(Math.random()*span));
         pending.push({packet:entry.packet,due:receivedAt+offset});
       }
@@ -67,7 +71,7 @@ function createSomeNanoEventFilter(emit) {
 
 // Nano application-level keepalive: https://docs.nano.org/integration-guides/websockets/#keepalive
 // Shared by the visualizer pages. Classic scripts also support opening the HTML through file://.
-// createEventFilter(emit) returns {push(packets, {batched, receivedAt}), stop()}.
+// createEventFilter(emit) returns {push(packets, {batched, receivedAt, durationMs}), stop()}.
 function createNanoFeed(endpoint, {onPacket, onStatus, onGap, createEventFilter}) {
   const url = new URL(endpoint);
   const host = url.host;
@@ -181,7 +185,7 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap, createEventFilter}
       if(repeater&&Array.isArray(batch.blocks)){
         const packets=batch.blocks.filter(block=>block&&typeof block==='object').map(block=>
           block.message?{...block,topic:'confirmation'}:{topic:'confirmation',message:block});
-        receiveEvents(packets,true,receivedAt);
+        receiveEvents(packets,true,receivedAt,batch.duration);
         return;
       }
       if(packet.ack==='pong'){handlePong();return}
@@ -198,13 +202,13 @@ function createNanoFeed(endpoint, {onPacket, onStatus, onGap, createEventFilter}
     current.onerror=()=>{if(ws===current)reconnect('Websocket connection error')};
     current.onclose=event=>{if(ws===current)reconnect('Websocket closed ('+event.code+')')};
   }
-  function receiveEvents(packets,batched,receivedAt){
+  function receiveEvents(packets,batched,receivedAt,durationMs){
     if(!packets.length)return;
     const topic=packets[0].topic;
     if(topic==='confirmation')lastConfirmation=performance.now();
     if(repeater){heartbeat='repeater / events received';attempts=0}
     topicState[topic]='receiving';delete topicErrors[topic];lastEvent=performance.now();
-    eventFilter.push(packets,{batched,receivedAt});publish();
+    eventFilter.push(packets,{batched,receivedAt,durationMs});publish();
   }
   function wake() {
     if(stopped)return;

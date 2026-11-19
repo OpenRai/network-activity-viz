@@ -91,24 +91,37 @@ test('SomeNano schedules linked sends before receives and unrelated blocks acros
  const draws=[0,.99,.2,.9];
  const h=harness('wss://node.somenano.com/repeater',{random:()=>draws.shift()});
  const s=h.sockets[0];s.open();
- s.message({blocks:[
+ s.message({block_dump:{duration:2001,blocks:[
    {hash:'R',account:'recipient',block:JSON.stringify({subtype:'receive',link:'send'})},
    {hash:'SEND',account:'sender',block:{subtype:'send'}},
    {hash:'U',account:'recipient',block:{subtype:'send'}},
    {hash:'LATE',account:'sender',block:{subtype:'send'}},
- ]});
+ ]}});
  const delivered=()=>h.packets.map(p=>p.message.hash);
- h.advance(999);expect(delivered()).toEqual([]);
+ h.advance(399);expect(delivered()).toEqual([]);
  h.advance(1);expect(delivered()).toEqual(['U']);
- h.advance(1475);expect(delivered()).toEqual(['U','SEND']);
- h.advance(25);expect(delivered()).toEqual(['U','SEND','R']);
+ h.advance(590);expect(delivered()).toEqual(['U','SEND']);
+ h.advance(10);expect(delivered()).toEqual(['U','SEND','R']);
  h.client.stop();h.advance(5000);expect(delivered()).toEqual(['U','SEND','R']);
  expect(h.timers.size).toBe(0);
 });
 test('the immediate filter can override SomeNano and preserves batch order',()=>{
  const h=harness('wss://node.somenano.com/repeater',{createEventFilter:emit=>({
-   push(packets,meta){expect(meta).toEqual({batched:true,receivedAt:0});packets.forEach(emit)},stop(){}
+   push(packets,meta){expect(meta).toEqual({batched:true,receivedAt:0,durationMs:8000});packets.forEach(emit)},stop(){}
  })});
- const s=h.sockets[0];s.open();s.message({blocks:[{hash:'B'},{hash:'A'}]});
+ const s=h.sockets[0];s.open();s.message({blocks:[{hash:'B'},{hash:'A'}],duration:8000});
  expect(h.packets.map(p=>p.message.hash)).toEqual(['B','A']);h.client.stop();
+});
+
+test('SomeNano uses the duration from each batch and falls back for invalid durations',()=>{
+ const h=harness('wss://node.somenano.com/repeater'),s=h.sockets[0];s.open();
+ s.message({block_dump:{duration:1000,blocks:[{hash:'SHORT'}]}});
+ s.message({block_dump:{duration:9000,blocks:[{hash:'LONG'}]}});
+ s.message({block_dump:{duration:-1,blocks:[{hash:'FALLBACK'}]}});
+ const delivered=()=>h.packets.map(p=>p.message.hash);
+ h.advance(998);expect(delivered()).toEqual([]);
+ h.advance(1);expect(delivered()).toEqual(['SHORT']);
+ h.advance(4000);expect(delivered()).toEqual(['SHORT','FALLBACK']);
+ h.advance(4000);expect(delivered()).toEqual(['SHORT','FALLBACK','LONG']);
+ h.client.stop();
 });
