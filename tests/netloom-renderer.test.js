@@ -27,3 +27,27 @@ test('page restore recreates the renderer with a fresh transferable canvas',()=>
 test('main-thread painting stays the default after worker frame-delivery regression',()=>{
  const {renderer,workers,results}=setup('');renderer.paint(frame(1));expect(workers).toHaveLength(0);expect(results.at(-1).thread).toBe('main');renderer.dispose();
 });
+
+test('painter restores canvas scaling after the backing context resets', () => {
+ const clearScales = [];
+ class Canvas {
+  context = {
+   scaleX: 1,
+   setTransform(x) { this.scaleX = x; },
+   clearRect() { clearScales.push(this.scaleX); },
+   fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
+   drawImage() {}, fillText() {}, save() {}, restore() {},
+  };
+  getContext() { return this.context; }
+ }
+ const context = vm.createContext({OffscreenCanvas: Canvas, performance, createNetloomVisibility: () => ({})});
+ vm.runInContext(readFileSync(new URL('../js/netloom-painter.js', import.meta.url), 'utf8'), context);
+ const canvas = new Canvas();
+ const painter = context.createNetloomPainter(canvas);
+ const scene = {cells: [], ticks: Array(9).fill(0), previousTicks: Array(9).fill(0)};
+ const view = {...frame(1, scene), dpr: 2, options: {useGridCache: true}};
+ painter.paint(scene, view);
+ canvas.context.setTransform(1, 0, 0, 1, 0, 0);
+ painter.paint(scene, view);
+ expect(clearScales).toEqual([2, .25, 2, .25]);
+});

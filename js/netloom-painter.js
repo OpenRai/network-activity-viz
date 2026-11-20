@@ -15,9 +15,8 @@ const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':'Ӿ'+(x>=.001&&x<1e
 
  function resize(dpr){
   if(density===dpr)return;density=dpr;canvas.width=Math.round(PLANE_W*dpr);canvas.height=Math.round(PLANE_H*dpr);
-  boardContext.setTransform(dpr,0,0,dpr,0,0);
   grid=makeCanvas(canvas.width,canvas.height);const gc=grid.getContext('2d');gc.setTransform(dpr,0,0,dpr,0,0);paintGrid(gc);
-  if(!glow){glow=makeCanvas(400,250);glowContext=glow.getContext('2d');glowContext.scale(.25,.25)}
+  if(!glow){glow=makeCanvas(400,250);glowContext=glow.getContext('2d')}
  }
  function paint(scene,frame){
   const started=performance.now(),metrics={};
@@ -25,7 +24,10 @@ const fmt=x=>x<1e-12?String(+(x*1e30).toPrecision(3))+' raw':'Ӿ'+(x>=.001&&x<1e
   const {now,windowMs:Te,viewport:[w,h],matrix:viewMatrix,options:{smoothScene,cullScene,useGridCache},reducedMotion:RM}=frame;
   resize(frame.dpr);
 
- const c=boardContext,l=glowContext;c.clearRect(0,0,PLANE_W,PLANE_H);l.clearRect(0,0,PLANE_W,PLANE_H);
+ const c=boardContext,l=glowContext;
+ c.setTransform(frame.dpr,0,0,frame.dpr,0,0);
+ l.setTransform(.25,0,0,.25,0,0);
+ c.clearRect(0,0,PLANE_W,PLANE_H);l.clearRect(0,0,PLANE_W,PLANE_H);
  if(useGridCache)c.drawImage(grid,0,0,PLANE_W,PLANE_H);else paintGrid(c);
  const {cells,receives}=scene;
  const visibility=createNetloomVisibility(viewMatrix,w,h);let marksDrawn=0,labelsDrawn=0;

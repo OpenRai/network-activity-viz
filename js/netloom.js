@@ -126,6 +126,7 @@ function drawHdr(now){
  hdr.draw(w,overlayHeight,dpr);
 }
 function overlay(now){
+ ox.setTransform(dpr,0,0,dpr,0,0);
  ox.clearRect(0,0,w,h);ox.fillStyle=vignette;ox.fillRect(0,0,w,h);ox.font='10px monospace';ox.fillStyle='#598195';ox.textAlign='right';
  const {right,width,gradient}=spectrum;
  const legendBaseline=h-61;
