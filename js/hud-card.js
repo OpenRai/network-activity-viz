@@ -37,14 +37,27 @@ function bindHudSound(soundFX) {
   icon.className = 'sound-symbol';
   icon.setAttribute('aria-hidden', 'true');
   icon.textContent = '♫';
-  button.append(icon, 'Sound');
+  const label = document.createTextNode('Sound');
+  button.append(icon, label);
   document.getElementById('hud-shell').append(button);
 
   const sync = () => button.setAttribute('aria-pressed', String(toggle.checked));
+  let attempt = 0;
+  function resetSound() {
+    attempt++;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event('input', {bubbles:true}));
+    label.textContent = 'Retry';
+    button.setAttribute('aria-label', 'Enable sound');
+  }
+  soundFX.setGestureRequiredHandler(resetSound);
   sync();
   toggle.addEventListener('input', sync);
   button.addEventListener('click', () => toggle.click());
   toggle.addEventListener('change', async () => {
+    const currentAttempt = ++attempt;
+    label.textContent = 'Sound';
+    button.removeAttribute('aria-label');
     if (!toggle.checked) {
       soundFX.disable();
       status.textContent = '';
@@ -52,9 +65,12 @@ function bindHudSound(soundFX) {
     }
     try {
       await soundFX.enable();
-      if (toggle.checked) soundFX.play({frequency:440, volume:.12});
+      if (currentAttempt === attempt && toggle.checked) soundFX.play({frequency:440, volume:.12});
     } catch {
-      if (toggle.checked) status.textContent = 'Audio paused · turn sound off and on to retry.';
+      if (currentAttempt !== attempt || !toggle.checked) return;
+      soundFX.disable();
+      resetSound();
+      status.textContent = 'Audio paused · enable Sound to resume.';
     }
   });
 }

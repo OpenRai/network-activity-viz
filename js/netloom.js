@@ -1,6 +1,7 @@
 (()=>{
 const $=id=>document.getElementById(id);
 const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const stage=$('netloom-stage');
 let cv=$('c');const ov=$('o'),ox=ov.getContext('2d');
 const hdr=createHdrHighlights(ov,$('hdrSetting'),'netloom-hdr');
 let hdrPulses=[];
@@ -28,7 +29,7 @@ const PLANE_W=1600,PLANE_H=1000;
 const smoothScene=!RM&&!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('smoothScene')==='0');
 let lastCameraTime=performance.now();
 const timeCamera=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('cameraTime')==='0');
-let framing, spectrum;
+let framing, spectrum, overlayHeight;
 let scene=null,lastLayoutAt=0,viewMatrix=[1,0,0,1,0,0];
 const cullScene=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('cullScene')==='0');
 const useLabelCache=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('labelCache')==='0');
@@ -38,7 +39,10 @@ function markerStyle(m){
 }
 const useGridCache=!(globalThis.netloomPerf&&new URLSearchParams(location.search).get('gridCache')==='0');
 function size(){
- const oldW=w||innerWidth,oldH=h||innerHeight;dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;
+ const nextW=stage.clientWidth,nextH=stage.clientHeight,nextDpr=Math.min(devicePixelRatio||1,2);
+ if(!nextW||!nextH||(nextW===w&&nextH===h&&nextDpr===dpr))return;
+ const oldW=w||nextW,oldH=h||nextH;dpr=nextDpr;w=nextW;h=nextH;
+ overlayHeight=Math.max(1,ov.clientHeight);
  framing=netloomDefaultFraming(w,h);
  if(cameraControls){camera.x+=(w-oldW)/2;camera.y+=(h-oldH)/2}else{camera={x:w/2,y:h/2,s:1};cameraControls=createMapControls(ov,camera,()=>({width:w,height:h,cx:w/2,cy:h/2}))}
  renderer.resize(dpr);
@@ -109,26 +113,26 @@ function render(){
  cv.style.transform=`matrix(${a*ratio*camera.s},${b*ratio*camera.s},${c*camera.s},${d*camera.s},${w/2+(translateX-camera.x)*camera.s},${h/2+(translateY-camera.y)*camera.s})`;
 }
 function drawHdr(now){
- const height=Math.max(1,h-68);
  if(hdr.active()){
   const [a,b,c,d,offsetX,offsetY]=viewMatrix;
   for(const {x,y,halfWidth,halfHeight,glowRadius,round,at,pulse} of hdrPulses){
    if(now-at>=900)continue;
    const centerX=a*x+c*y+offsetX,centerY=b*x+d*y+offsetY;
    const opacity=Math.min(pulse,1-(now-at)/900);
-   hdr.add(centerX,centerY,glowRadius*Math.hypot(a,b),opacity*.55,w,height,1.5);
-   hdr.addSolid(centerX,centerY,a*halfWidth,b*halfWidth,c*halfHeight,d*halfHeight,opacity,w,height,4,round);
+   hdr.add(centerX,centerY,glowRadius*Math.hypot(a,b),opacity*.55,w,overlayHeight,1.5);
+   hdr.addSolid(centerX,centerY,a*halfWidth,b*halfWidth,c*halfHeight,d*halfHeight,opacity,w,overlayHeight,4,round);
   }
  }
- hdr.draw(w,height,dpr);
+ hdr.draw(w,overlayHeight,dpr);
 }
 function overlay(now){
  ox.clearRect(0,0,w,h);ox.fillStyle=vignette;ox.fillRect(0,0,w,h);ox.font='10px monospace';ox.fillStyle='#598195';ox.textAlign='right';
  const {right,width,gradient}=spectrum;
- ox.fillText(new Date(now).toISOString().replace(/\.\d{3}Z$/,'Z'),right,h-128);
- ox.fillText('CONFIRMED BLOCKS / AMOUNT × OBSERVER TIME',right,h-111,w-48);
- ox.fillStyle=gradient;ox.fillRect(right-width,h-104,width,4);
- ox.fillStyle='#285568';ox.fillText('LINKED TRACES / OBSERVED SOURCE',right,h-87,w-48);
+ const legendBaseline=h-61;
+ ox.fillText(new Date(now).toISOString().replace(/\.\d{3}Z$/,'Z'),right,legendBaseline-41);
+ ox.fillText('CONFIRMED BLOCKS / AMOUNT × OBSERVER TIME',right,legendBaseline-24,w-48);
+ ox.fillStyle=gradient;ox.fillRect(right-width,legendBaseline-17,width,4);
+ ox.fillStyle='#285568';ox.fillText('LINKED TRACES / OBSERVED SOURCE',right,legendBaseline,w-48);
  if(!markers.some(marker=>now-marker.at<=Te)){ox.fillStyle='#71bbd1';ox.textAlign='center';ox.fillText('WAITING FOR CONFIRMED BLOCKS',w*.58,h*.48)}
 }
 
@@ -196,7 +200,10 @@ gallerySettings.onMemoryChange(()=>{
 });
 addEventListener('pointermove',e=>{if(!cameraControls.isGesture())tx=e.clientX/innerWidth-.5});
 addEventListener('resize',size);
-addEventListener('pagehide',()=>renderer.dispose());addEventListener('pageshow',()=>renderer.resume());
+new ResizeObserver(size).observe(stage);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)size()});
+addEventListener('pagehide',()=>renderer.dispose());
+addEventListener('pageshow',()=>{size();renderer.resume()});
 setInterval(()=>{hud(Date.now());overlay(Date.now())},500);
 if(globalThis.netloomPerf)netloomPerf.attach({state:()=>({markers:markers.length,canvas:[cv.width,cv.height],camera:{...camera},renderer:renderer.diagnostics(),audio:soundFX.diagnostics?.()}),start:({rate=5,seconds=30,audio=true,draw=true,history=0}={})=>{stop();resetStream();if(history){const historical=createStressDemo({seed:20261104,transfers:Math.ceil(history),duration:600000});for(const item of historical.events.slice(0,history)){item.message.hash='F'+item.message.hash.slice(1);if(item.message.block.subtype==='receive')item.message.block.link='F'+item.message.block.link.slice(1);handleConfirmation({topic:'confirmation',message:item.message},Date.now()-600000+item.at,true)}}const data=createStressDemo({seed:20261105,transfers:Math.ceil(rate*seconds),duration:seconds*1000+8000});simulation={...data,index:0,start:performance.now(),scale:1};globalThis.netloomPerfDraw=draw;if(audio)soundFX.enable();else soundFX.disable();}});
 size();connect();

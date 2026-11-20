@@ -209,7 +209,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf, starmap
   let selected = 'air', backend = profile === 'cyber' ? 'zzfx' : 'legacy', volumeMultiplier = 1;
   let pending = null, queued = null, disposed = false;
   let masterGain = null, masterLimiter = null, masterShaper = null, outputProbe = null;
-  let isHidden = typeof document !== 'undefined' ? document.hidden : false;
+  let clockCheck = null, onGestureRequired = () => {};
   function clearVoices() {
     synthesisGeneration++; preparingVoices = 0;
     synthesisWorker?.cancelAll(); pendingSamples.clear();
@@ -221,6 +221,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf, starmap
     }
   }
   function release() {
+    cancelClockCheck();
     queued = null;
     pending?.cancel();
     pending = null;
@@ -290,7 +291,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf, starmap
       if (cue && Date.now() - cue.at < 2000) play(cue.options);
     }).catch(error => {
       // Hidden tabs may have browser-managed suspension; retain their context.
-      if (!document.hidden && context === target) release();
+      if (!document.hidden && context === target) requireGesture();
       throw error;
     }).finally(() => {
       clearTimeout(timer);
@@ -298,19 +299,46 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf, starmap
     });
     return operation.promise;
   }
+  function requireGesture() {
+    enabled = false;
+    release();
+    onStatus('Audio paused · enable Sound to resume.');
+    onGestureRequired();
+  }
   function recover() {
-    if (enabled && !disposed) ready().catch(() => {});
+    if (enabled && !disposed && !document.hidden) ready().catch(() => {});
+  }
+  function cancelClockCheck() {
+    clearTimeout(clockCheck);
+    clockCheck = null;
+  }
+  function foreground() {
+    if (!enabled || disposed || document.hidden) return;
+    const recovery = ready();
+    const target = context;
+    recovery.then(() => {
+      if (!enabled || !target || context !== target || document.hidden ||
+          target.state !== 'running' || clockCheck !== null) return;
+      const startedAt = target.currentTime;
+      // After wake, a context can report running even though its audio clock is frozen.
+      clockCheck = setTimeout(() => {
+        clockCheck = null;
+        if (!enabled || context !== target || document.hidden) return;
+        if (target.state !== 'running') recover();
+        else if (target.currentTime <= startedAt) requireGesture();
+      }, 750);
+    }).catch(() => {});
   }
   function visibility() {
-    isHidden = document.hidden;
-    if (!isHidden && enabled) recover();
+    if (document.hidden) cancelClockCheck();
+    else foreground();
   }
   const listeners = [
     [window, 'pointerdown', recover],
     [window, 'touchstart', recover],
     [window, 'keydown', recover],
-    [window, 'focus', recover],
-    [window, 'pageshow', recover],
+    [window, 'focus', foreground],
+    [window, 'pageshow', foreground],
     [window, 'pagehide', release],
     [document, 'freeze', release],
     [document, 'visibilitychange', visibility]
@@ -733,10 +761,7 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf, starmap
       const expiry = setTimeout(() => {
         try { source.stop(); } catch {}
         source.onended?.();
-        if (context === owner && Number.isFinite(startedAt) && owner.currentTime === startedAt) {
-          release();
-          onStatus('Audio paused · waiting for the next sound or user interaction.');
-        }
+        if (context === owner && !document.hidden && owner.state === 'running' && owner.currentTime === startedAt) requireGesture();
       }, duration * 1000 + 1000);
       source.onended = () => {
         clearTimeout(expiry);
@@ -754,5 +779,5 @@ function createSoundFX({profile = 'ethereal', onStatus = () => {}, perf, starmap
       perf?.record('activeVoices', voices.size);
     }
   }
-  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, diagnostics:()=>{let rms=null,peak=null;if(outputProbe){const samples=new Float32Array(outputProbe.fftSize);outputProbe.getFloatTimeDomainData(samples);rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);peak=samples.reduce((peak,x)=>Math.max(peak,Math.abs(x)),0)}return {rms,peak,state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size,retiring:retiringVoices.size,preparing:preparingVoices,workerJobs:(legacyWorker??synthesisWorker)?.pending||0,workerEnabled:legacyWorker?!legacyWorkerFailed:!!synthesisWorker&&!workerFailed,workerActive:(legacyWorker??synthesisWorker)?.active||false,effectsBuses:sharedEffects?1:0,effectTails:effectTails.size,cacheEntries:sampleCache.size,cacheBytes:sampleCacheBytes}}};
+  return {enable, disable: stop, play, setSoundSet, setVolumeMultiplier, dispose, setGestureRequiredHandler(handler) { onGestureRequired = handler; }, diagnostics:()=>{let rms=null,peak=null;if(outputProbe){const samples=new Float32Array(outputProbe.fftSize);outputProbe.getFloatTimeDomainData(samples);rms=Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length);peak=samples.reduce((peak,x)=>Math.max(peak,Math.abs(x)),0)}return {rms,peak,state:context?.state,currentTime:context?.currentTime,voices:voices.size,scheduled:scheduledVoices.size,retiring:retiringVoices.size,preparing:preparingVoices,workerJobs:(legacyWorker??synthesisWorker)?.pending||0,workerEnabled:legacyWorker?!legacyWorkerFailed:!!synthesisWorker&&!workerFailed,workerActive:(legacyWorker??synthesisWorker)?.active||false,effectsBuses:sharedEffects?1:0,effectTails:effectTails.size,cacheEntries:sampleCache.size,cacheBytes:sampleCacheBytes}}};
 }

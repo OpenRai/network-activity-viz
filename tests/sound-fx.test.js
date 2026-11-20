@@ -81,12 +81,36 @@ test('page suspension releases resources; pageshow recreates only after opt-in',
  await new Promise(resolve=>setTimeout(resolve,0));expect(h.contexts.length).toBe(2);expect(h.fx.play()).toBe(true);
  h.fx.dispose();h.window.dispatchEvent(new Event('pageshow'));expect(h.contexts.length).toBe(2);
 });
-test('a failed resume can recreate audio on the next gesture',async()=>{
- const h=harness();await h.fx.enable();h.contexts[0].state='suspended';
+test('a failed foreground resume requires explicit Sound opt-in again',async()=>{
+ const h=harness();let resets=0;h.fx.setGestureRequiredHandler(()=>resets++);
+ await h.fx.enable();h.contexts[0].state='suspended';
  h.contexts[0].resumeHook=()=>Promise.reject(Error('Lost device'));
- await expect(h.fx.enable()).rejects.toThrow('Lost device');expect(h.contexts[0].closed).toBe(true);
+ h.window.dispatchEvent(new Event('focus'));
+ await new Promise(resolve=>setTimeout(resolve,0));
+ expect(h.contexts[0].closed).toBe(true);expect(resets).toBe(1);
  h.window.dispatchEvent(new Event('pointerdown'));await new Promise(resolve=>setTimeout(resolve,0));
+ expect(h.contexts.length).toBe(1);expect(h.fx.play()).toBe(false);
+ await h.fx.enable();
  expect(h.contexts.length).toBe(2);expect(h.fx.play()).toBe(true);h.fx.dispose();
+});
+
+test('foreground clock check detects a frozen running context and preserves an advancing one',async()=>{
+ const h=harness();let resets=0;h.fx.setGestureRequiredHandler(()=>resets++);
+ await h.fx.enable();
+ const ctx=h.contexts[0];
+ const reopen=async()=>{
+  h.document.hidden=true;h.document.dispatchEvent(new Event('visibilitychange'));
+  h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));
+  await Promise.resolve();
+ };
+ await reopen();
+ ctx.currentTime+=.25;
+ await new Promise(resolve=>setTimeout(resolve,800));
+ expect(resets).toBe(0);
+ await reopen();
+ await new Promise(resolve=>setTimeout(resolve,800));
+ expect(resets).toBe(1);expect(ctx.closed).toBe(true);expect(h.fx.play()).toBe(false);
+ h.fx.dispose();
 });
 
 test('a resume that never settles times out and closes the failed context',async()=>{
@@ -200,7 +224,7 @@ test('Starmap worker transfers the same PCM as synchronous playback at fixed jit
  let response, transferred;
  const self = {postMessage(data, transfer){response=data;transferred=transfer}};
  const worker = vm.createContext({self,performance,importScripts(name){
-  expect(name).toBe('sound-fx.js?v=starmap-worker-1');
+  expect(name).toBe('sound-fx.js?v=sound-recovery-1');
   vm.runInContext(source,worker);
  }});
  vm.runInContext(workerScript, worker);

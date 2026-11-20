@@ -1,6 +1,6 @@
 'use strict';
 
-importScripts('sound-fx.js?v=starmap-worker-1');
+importScripts('sound-fx.js?v=sound-recovery-1');
 
 self.onmessage = ({data:{id, cue}}) => {
   const started = performance.now();
